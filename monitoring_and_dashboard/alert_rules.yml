@@ -1,0 +1,32 @@
+# alert_rules.yml - Legendary Edition
+# Define alert rules for monitoring Nodara BIOSPHÈRE QUANTIC
+
+groups:
+  - name: nodara_alerts
+    rules:
+      - alert: NodeUnsynchronized
+        expr: up{job="nodara_nodes"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node Unsynchronized"
+          description: "One or more nodes are not reporting metrics. Immediate attention required."
+
+      - alert: HighTransactionLatency
+        expr: nodara_transaction_latency_seconds > 0.5
+        for: 2m
+        labels:
+          severity: high
+        annotations:
+          summary: "High Transaction Latency"
+          description: "The average transaction latency is above 0.5 seconds for more than 2 minutes."
+
+      - alert: HighCPUUsage
+        expr: node_cpu_seconds_total > 0.8
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU Usage"
+          description: "CPU usage is above 80% on one or more nodes."
