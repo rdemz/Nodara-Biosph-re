@@ -1,0 +1,10 @@
+[package]
+name = "nodara_monitoring_and_dashboard"
+version = "1.0.0"
+authors = ["Your Name <your.email@example.com>"]
+edition = "2021"
+description = "Monitoring and Dashboard scripts and configuration for Nodara BIOSPHÈRE QUANTIC."
+license = "MIT"
+repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
+
+[dependencies]
