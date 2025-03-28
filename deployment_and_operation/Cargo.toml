@@ -3,8 +3,8 @@ name = "nodara_deployment_and_operations"
 version = "1.0.0"
 authors = ["Your Name <your.email@example.com>"]
 edition = "2021"
-description = "Deployment and operations scripts and configurations for Nodara BIOSPHÈRE QUANTIC."
+description = "Deployment and operations configuration for Nodara BIOSPHÈRE QUANTIC."
 license = "MIT"
-repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
 
-[dependencies]
+[lib]
+path = "src/lib.rs"
