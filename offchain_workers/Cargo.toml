@@ -2,6 +2,14 @@
 name = "offchain_workers"
 version = "1.0.0"
 edition = "2021"
+authors = ["Votre Nom <votre.email@example.com>"]
+description = "Offchain workers for Nodara BIOSPHÈRE QUANTIC: Library for offchain parallel processing tasks."
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+# Listez ici vos dépendances nécessaires pour ce module.
+# Par exemple, pour utiliser Rayon pour le traitement en parallèle :
+rayon = "1.6"
+log = "0.4"
