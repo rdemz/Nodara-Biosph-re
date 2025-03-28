@@ -1,27 +1,29 @@
 [package]
 name = "nodara_reputation"
 version = "1.0.0"
-authors = ["Your Name <your.email@example.com>"]
 edition = "2021"
-description = "Nodara Reputation Module - Decentralized reputation management for Nodara BIOSPHÈRE QUANTIC."
+authors = ["Votre Nom <votre.email@example.com>"]
+description = "Nodara Reputation Module for Nodara BIOSPHÈRE QUANTIC: Manages reputation scores and audit logs."
 license = "MIT"
-repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
 
 [dependencies]
-sp-core = { version = "6.0.0", default-features = false }
-sp-runtime = { version = "6.0.0", default-features = false }
 frame-support = { version = "6.0.0", default-features = false }
-frame-system = { version = "6.0.0", default-features = false }
-codec = "6.0.0"
-scale-info = "2.3.0"
-sp-std = "6.0.0"
-log = "0.4"
-env_logger = "0.10"
+frame-system  = { version = "6.0.0", default-features = false }
+sp-runtime    = { version = "6.0.0", default-features = false }
+sp-std        = { version = "6.0.0", default-features = false }
+parity-scale-codec = { version = "3.4.0", default-features = false }
+scale-info    = "2.3.0"
 
 [dev-dependencies]
-frame-benchmarking = "6.0.0"
-sp-keyring = "6.0.0"
-rand = "0.8"
+frame-benchmarking = { version = "6.0.0", default-features = false }
 
 [features]
-default = []
+default = ["std"]
+std = [
+  "frame-support/std",
+  "frame-system/std",
+  "sp-runtime/std",
+  "sp-std/std",
+  "parity-scale-codec/std",
+  "scale-info/std",
+]
