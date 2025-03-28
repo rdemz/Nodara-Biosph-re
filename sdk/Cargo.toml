@@ -1,0 +1,19 @@
+[package]
+name = "nodara_sdk"
+version = "1.0.0"
+authors = ["Your Name <your.email@example.com>"]
+edition = "2021"
+description = "Nodara SDK - A multi-language software development kit for interacting with Nodara BIOSPHÈRE QUANTIC."
+license = "MIT"
+repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
+rust-version = "1.68.0"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["json", "blocking"] }
+log = "0.4"
+env_logger = "0.10"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
