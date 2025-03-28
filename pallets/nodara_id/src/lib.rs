@@ -1,21 +1,19 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![recursion_limit = "1024"]
 
-//! # Nodara ID Module - Complete Version
+//! # Nodara ID Module - Version Complète et Verrouillée
 //!
-//! Ce module gère l'enregistrement et la mise à jour des identités décentralisées dans le réseau Nodara.
-//! Il inclut une gestion complète des erreurs, des événements, ainsi que des appels (extrinsics) pour
-//! l'enregistrement et la mise à jour des identités. La sérialisation se fait avec `parity-scale-codec`
-//! et le module est configuré pour être intégré dans un runtime Substrate.
+//! Ce module gère l'enregistrement et la mise à jour des identités décentralisées pour le réseau Nodara BIOSPHÈRE QUANTIC.
+//! Il inclut la gestion des erreurs, des événements, et des appels extrinsics pour enregistrer et mettre à jour l'identité d'un compte.
+//! La sérialisation est assurée par `parity-scale-codec` et les métadonnées par `scale-info`.
+//!
+//! **Note de déploiement :** Le timestamp utilisé ici est une valeur fixe pour les tests. En production, remplacez
+//! cette fonction par l'appel au `pallet_timestamp` afin d'obtenir un timestamp réel.
 //!
 //! ## Fonctionnalités
-//! - Enregistrement d'une identité avec des détails KYC.
-//! - Mise à jour d'une identité existante.
-//! - Stockage d'un historique des mises à jour d'identité pour traçabilité.
-//! - Gestion des erreurs et des événements.
-//!
-//! **Note :** Le timestamp utilisé ici est statique (pour simplifier), pensez à le remplacer par une source
-//! de temps réelle (par exemple via `pallet_timestamp`) en production.
+//! - Enregistrement d'une identité avec des détails KYC et statut de vérification par défaut.
+//! - Mise à jour d'une identité existante avec conservation de l'historique.
+//! - Stockage de l'historique des modifications pour audit et traçabilité.
 
 pub use pallet::*;
 
@@ -26,14 +24,14 @@ pub mod pallet {
         traits::Get,
     };
     use frame_system::pallet_prelude::*;
-    use parity_scale_codec::{Encode, Decode};
+    use parity_scale_codec::{Decode, Encode};
     use scale_info::TypeInfo;
     use sp_std::vec::Vec;
 
     /// Structure représentant les données d'identité d'un compte.
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     pub struct IdentityData {
-        /// Détails KYC sous forme d'octets (peut contenir des données chiffrées).
+        /// Détails KYC (peut contenir des données chiffrées).
         pub kyc_details: Vec<u8>,
         /// Statut de vérification de l'identité.
         pub verified: bool,
@@ -43,7 +41,7 @@ pub mod pallet {
     pub trait Config: frame_system::Config {
         /// Type d'événement du runtime.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-        /// Valeur par défaut pour le statut de vérification des identités (true = vérifié).
+        /// Valeur par défaut du statut de vérification (true = vérifié).
         #[pallet::constant]
         type DefaultVerification: Get<bool>;
         /// Longueur maximale autorisée pour les détails KYC.
@@ -51,23 +49,25 @@ pub mod pallet {
         type MaxKycLength: Get<u32>;
     }
 
-    /// Stockage principal des identités : mapping entre l'identifiant de compte et les données d'identité.
+    /// Stockage des identités : associe chaque compte à ses données d'identité.
     #[pallet::storage]
     #[pallet::getter(fn identities)]
-    pub type Identities<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, IdentityData, OptionQuery>;
+    pub type Identities<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, IdentityData, OptionQuery>;
 
-    /// Historique des mises à jour des identités.
+    /// Historique des mises à jour d'identité.
     /// Chaque entrée est un tuple : (timestamp, AccountId, ancien statut, nouveau statut, détails KYC)
     #[pallet::storage]
     #[pallet::getter(fn identity_history)]
-    pub type IdentityHistory<T: Config> = StorageValue<_, Vec<(u64, T::AccountId, bool, bool, Vec<u8>)>, ValueQuery>;
+    pub type IdentityHistory<T: Config> =
+        StorageValue<_, Vec<(u64, T::AccountId, bool, bool, Vec<u8>)>, ValueQuery>;
 
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        /// Identité enregistrée avec succès.
+        /// Événement émis lors de l'enregistrement d'une identité.
         IdentityRegistered(T::AccountId, Vec<u8>, bool),
-        /// Identité mise à jour avec succès.
+        /// Événement émis lors de la mise à jour d'une identité.
         IdentityUpdated(T::AccountId, Vec<u8>, bool, bool),
     }
 
@@ -84,7 +84,6 @@ pub mod pallet {
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
-    // Appels extrinsics pour enregistrer et mettre à jour l'identité.
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         /// Enregistre une nouvelle identité pour le compte appelant.
@@ -92,7 +91,10 @@ pub mod pallet {
         /// - **origin**: Le compte qui s'enregistre.
         /// - **kyc_details**: Détails KYC sous forme d'octets.
         #[pallet::weight(10_000)]
-        pub fn register_identity(origin: OriginFor<T>, kyc_details: Vec<u8>) -> DispatchResult {
+        pub fn register_identity(
+            origin: OriginFor<T>,
+            kyc_details: Vec<u8>,
+        ) -> DispatchResult {
             let who = ensure_signed(origin)?;
             ensure!(
                 kyc_details.len() as u32 <= T::MaxKycLength::get(),
@@ -121,7 +123,11 @@ pub mod pallet {
         /// - **new_kyc_details**: Nouveaux détails KYC.
         /// - **new_verified**: Nouveau statut de vérification.
         #[pallet::weight(10_000)]
-        pub fn update_identity(origin: OriginFor<T>, new_kyc_details: Vec<u8>, new_verified: bool) -> DispatchResult {
+        pub fn update_identity(
+            origin: OriginFor<T>,
+            new_kyc_details: Vec<u8>,
+            new_verified: bool,
+        ) -> DispatchResult {
             let who = ensure_signed(origin)?;
             ensure!(
                 new_kyc_details.len() as u32 <= T::MaxKycLength::get(),
@@ -143,9 +149,11 @@ pub mod pallet {
     }
 
     impl<T: Config> Pallet<T> {
-        /// Retourne un timestamp statique (à remplacer par une source de temps réelle en production).
+        /// Retourne un timestamp fixe.
+        ///
+        /// **Attention :** Cette fonction utilise une valeur statique pour simplifier les tests.
+        /// En production, intégrez le `pallet_timestamp` pour obtenir le temps réel.
         fn current_timestamp() -> u64 {
-            // Pour des tests, on utilise ici une valeur fixe.
             1_640_000_000
         }
     }
