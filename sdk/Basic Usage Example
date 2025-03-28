@@ -1,0 +1,16 @@
+import { NodaraSDK } from "nodara-sdk";
+
+// Initialize the SDK with the API base URL
+const sdk = new NodaraSDK("https://testnet.nodara.io/api");
+
+// Submit a governance proposal
+async function submitProposal() {
+    try {
+        const response = await sdk.governance.submitProposal("Update fee structure", "transaction_fee", "0.001");
+        console.log("Proposal submitted:", response);
+    } catch (error) {
+        console.error("Error submitting proposal:", error);
+    }
+}
+
+submitProposal();
