@@ -1,0 +1,139 @@
+import requests
+import time
+import logging
+from substrateinterface import SubstrateInterface, Keypair
+from substrateinterface.exceptions import SubstrateRequestException
+
+# Configuration du logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Dictionnaire des sources réelles et accessibles sans authentification
+DATA_SOURCES = {
+    # Crypto-monnaies (prix du Bitcoin en USD)
+    "coingecko": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+    "cryptocompare": "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD",
+    "binance": "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
+    "kraken": "https://api.kraken.com/0/public/Ticker?pair=XBTUSD",
+    "bitfinex": "https://api.bitfinex.com/v1/pubticker/btcusd",
+    "bitstamp": "https://www.bitstamp.net/api/v2/ticker/btcusd/",
+    "gemini": "https://api.gemini.com/v1/pubticker/btcusd",
+    "huobi": "https://api.huobi.pro/market/detail/merged?symbol=btcusdt",
+    "coinpaprika": "https://api.coinpaprika.com/v1/tickers/btc-bitcoin",
+    "kucoin": "https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=BTC-USDT",
+    "gateio": "https://api.gateio.ws/api/v4/spot/tickers?currency_pair=BTC_USDT",
+    
+    # Marchés boursiers (exemple avec Yahoo Finance pour AAPL)
+    "yahoo_finance": "https://query1.finance.yahoo.com/v7/finance/quote?symbols=AAPL"
+}
+
+def fetch_data_from_source(name, url):
+    """
+    Récupère la donnée depuis une source donnée.
+    Retourne un float représentant, par exemple, le prix du Bitcoin ou d'une action.
+    """
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        if name == "coingecko":
+            # Exemple : {"bitcoin": {"usd": 20000}}
+            value = data.get("bitcoin", {}).get("usd", 0)
+            return float(value) if value else None
+        elif name == "cryptocompare":
+            # Exemple : {"USD": 20000}
+            value = data.get("USD", 0)
+            return float(value) if value else None
+        elif name in {"binance", "bitfinex", "bitstamp", "gemini", "huobi", "kucoin", "gateio"}:
+            # Ces API renvoient souvent un objet contenant "price"
+            value = data.get("price", 0)
+            return float(value) if value else None
+        elif name == "kraken":
+            # Kraken : structure complexe
+            result = list(data.get("result", {}).values())[0]
+            value = result.get("c", [0])[0]
+            return float(value) if value else None
+        elif name == "coinpaprika":
+            # Exemple : {"quotes": {"USD": {"price": 20000}}}
+            value = data.get("quotes", {}).get("USD", {}).get("price", 0)
+            return float(value) if value else None
+        elif name == "yahoo_finance":
+            # Yahoo Finance renvoie un JSON avec "quoteResponse"
+            quotes = data.get("quoteResponse", {}).get("result", [])
+            if quotes:
+                value = quotes[0].get("regularMarketPrice", 0)
+                return float(value) if value else None
+        else:
+            # Extraction par défaut
+            value = data.get("price", 0)
+            return float(value) if value else None
+    except Exception as e:
+        logging.error(f"Erreur lors de la récupération depuis {name} ({url}): {e}")
+        return None
+
+def aggregate_prices(prices):
+    """
+    Agrège les valeurs récupérées en effectuant une moyenne simple.
+    Seules les valeurs positives et non-nulles sont prises en compte.
+    """
+    valid_prices = [p for p in prices if p is not None and p > 0]
+    if not valid_prices:
+        raise ValueError("Aucune donnée valide récupérée")
+    aggregated_value = sum(valid_prices) / len(valid_prices)
+    logging.info(f"Valeur agrégée calculée: {aggregated_value:.2f}")
+    return aggregated_value
+
+def submit_data_to_oracle(substrate, keypair, value):
+    """
+    Compose et soumet une transaction à l'oracle de Nodara pour enregistrer la valeur agrégée.
+    """
+    try:
+        call = substrate.compose_call(
+            call_module='OracleModule',
+            call_function='submit_data',
+            call_params={'value': int(value)}  # Conversion en entier pour l'exemple
+        )
+        extrinsic = substrate.create_signed_extrinsic(call=call, keypair=keypair)
+        receipt = substrate.submit_extrinsic(extrinsic, wait_for_inclusion=True)
+        logging.info(f"Extrinsic incluse dans le block '{receipt.block_hash}'")
+    except SubstrateRequestException as e:
+        logging.error(f"Erreur lors de la soumission de la donnée: {e}")
+
+def main():
+    # Connexion au nœud Substrate (testnet de Nodara)
+    try:
+        substrate = SubstrateInterface(
+            url="wss://nodara-testnet.example.org",  # Remplacez par l'URL réelle du nœud testnet
+            ss58_format=42,
+            type_registry_preset='substrate-node-template'
+        )
+    except Exception as e:
+        logging.critical(f"Impossible de se connecter au nœud: {e}")
+        return
+
+    # Clé privée du fournisseur (à stocker de manière sécurisée)
+    keypair = Keypair.create_from_uri('//Alice')  # Pour test; remplacez par la clé réelle
+
+    while True:
+        try:
+            logging.info("Démarrage du cycle de collecte de données depuis les sources réelles...")
+            values = []
+            for source_name, url in DATA_SOURCES.items():
+                value = fetch_data_from_source(source_name, url)
+                if value:
+                    logging.info(f"Source '{source_name}' ({url}): {value:.2f}")
+                else:
+                    logging.warning(f"Source '{source_name}' ({url}) n'a pas retourné de donnée valide")
+                values.append(value)
+            
+            aggregated_value = aggregate_prices(values)
+            submit_data_to_oracle(substrate, keypair, aggregated_value)
+            
+        except Exception as e:
+            logging.error(f"Erreur lors du cycle de collecte/soumission: {e}")
+        
+        # Pause de 5 minutes avant le prochain cycle
+        time.sleep(300)
+
+if __name__ == "__main__":
+    main()
