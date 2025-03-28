@@ -1,0 +1,68 @@
+[package]
+name = "nodara-biosphere-quantic"
+version = "1.0.0"
+authors = ["Your Name <your.email@example.com>"]
+edition = "2021"
+description = "Nodara BIOSPHÈRE QUANTIC – A next-generation adaptive blockchain platform with advanced security, scalability, and decentralized governance."
+license = "MIT"
+repository = "https://github.com/yourusername/nodara-biosphere-quantic"
+rust-version = "1.68.0"
+
+[dependencies]
+# Core Substrate and blockchain dependencies
+sp-core = { version = "6.0.0", default-features = false }
+sp-runtime = { version = "6.0.0", default-features = false }
+sp-io = { version = "6.0.0", default-features = false }
+frame-support = { version = "6.0.0", default-features = false }
+frame-system = { version = "6.0.0", default-features = false }
+codec = "6.0.0"
+scale-info = "2.3.0"
+
+# Additional common dependencies
+sp-std = "6.0.0"
+log = "0.4"
+env_logger = "0.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.0", features = ["derive"] }
+
+[dev-dependencies]
+frame-benchmarking = "6.0.0"
+sp-keyring = "6.0.0"
+rand = "0.8"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "z"
+panic = "abort"
+
+[workspace]
+members = [
+    "node",
+    "runtime",
+    "pallets/nodara_biosphere",
+    "pallets/nodara_growth_model",
+    "pallets/nodara_stability_guard",
+    "pallets/nodara_liquidity_flow",
+    "pallets/nodara_reserve_fund",
+    "pallets/nodara_reward_engine",
+    "pallets/nodara_id",
+    "pallets/nodara_marketplace",
+    "pallets/nodara_iot_bridge",
+    "pallets/nodara_interop",
+    "pallets/nodara_predictive_guard",
+    "pallets/nodara_reputation",
+    "pallets/nodara_standards",
+    "ci_cd",
+    "cli",
+    "deployment_and_operations",
+    "docs",
+    "sdk",
+    "risk_management",
+    "bug_bounty_and_community",
+    "monitoring_and_dashboard",
+    "offchain_workers",
+    "legal_and_compliance"
+    # Add additional members as necessary.
+]
