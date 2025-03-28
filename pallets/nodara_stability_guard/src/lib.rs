@@ -1,22 +1,33 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![recursion_limit = "1024"]
 
-//! # nodara_stability_guard - Legendary Edition
+//! # Nodara Stability Guard Module - Dynamic Network Stability Management
 //!
-//! This module monitors the network’s volatility and dynamically adjusts stability parameters.
-//! It uses predictive analytics and a smoothing algorithm to ensure that the network remains stable and resilient,
-//! even under fluctuating conditions. Every change is recorded for full auditability and transparency.
+//! This module monitors network volatility and dynamically adjusts a stability parameter to maintain the
+//! overall health of the network. It logs every adjustment for full auditability and supports DAO-driven
+//! configuration updates. The new parameter is computed by adding an adjustment (based on the measured volatility
+//! and a smoothing factor) to the current parameter value.
 
-use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
+use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Get};
 use frame_system::pallet_prelude::*;
 use sp_std::vec::Vec;
 use sp_runtime::RuntimeDebug;
+use parity_scale_codec::{Encode, Decode};
+use scale_info::TypeInfo;
 
-/// Structure representing the stability state.
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, Default)]
-pub struct StabilityState {
+/// Structure representing a record of a stability adjustment.
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
+pub struct StabilityRecord {
+    pub timestamp: u64,
     pub parameter: u32,
-    pub history: Vec<(u64, u32, u32, u32)>, // (timestamp, previous parameter, new parameter, volatility signal)
+    pub volatility: u32,
+}
+
+/// Global state of the stability guard.
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, Default, TypeInfo)]
+pub struct StabilityState {
+    pub current_parameter: u32,
+    pub history: Vec<StabilityRecord>,
 }
 
 #[frame_support::pallet]
@@ -24,20 +35,23 @@ pub mod pallet {
     use super::*;
 
     #[pallet::pallet]
+    #[pallet::generate_store(pub(super) trait Store)]
     pub struct Pallet<T>(_);
 
+    /// Configuration du module.
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// Runtime event type.
+        /// Type d'événement.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-        /// Baseline stability parameter value.
+        /// Paramètre de stabilité de base pour l'initialisation.
         #[pallet::constant]
-        type BaselineStability: Get<u32>;
-        /// Smoothing factor for stability adjustments.
+        type BaselineParameter: Get<u32>;
+        /// Facteur de lissage utilisé pour calculer l'ajustement.
         #[pallet::constant]
-        type StabilitySmoothingFactor: Get<u32>;
+        type SmoothingFactor: Get<u32>;
     }
 
+    /// Stockage de l'état de stabilité.
     #[pallet::storage]
     #[pallet::getter(fn stability_state)]
     pub type StabilityStateStorage<T: Config> = StorageValue<_, StabilityState, ValueQuery>;
@@ -45,44 +59,64 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        /// Emitted when the stability parameter is updated.
-        StabilityUpdated(u32, u32, u32), // (previous parameter, new parameter, volatility signal)
+        /// Événement émis lors de la mise à jour du paramètre de stabilité.
+        /// (ancien paramètre, nouveau paramètre, volatilité mesurée)
+        StabilityParameterUpdated(u32, u32, u32),
     }
 
     #[pallet::error]
     pub enum Error<T> {
-        /// Provided volatility signal is invalid.
-        InvalidVolatilitySignal,
+        /// La valeur de volatilité fournie est invalide.
+        InvalidVolatility,
     }
 
+    #[pallet::call]
     impl<T: Config> Pallet<T> {
-        /// Initializes the stability state with the baseline value.
-        pub fn initialize_stability() -> DispatchResult {
-            let now = <frame_system::Pallet<T>>::block_number().saturated_into::<u64>();
-            let baseline = T::BaselineStability::get();
+        /// Initialise l'état de stabilité avec la valeur de base.
+        ///
+        /// Cette fonction doit être appelée par la racine (Root) afin d'initialiser le module.
+        #[pallet::weight(10_000)]
+        pub fn initialize_state(origin: OriginFor<T>) -> DispatchResult {
+            ensure_root(origin)?;
+            let timestamp = <frame_system::Pallet<T>>::block_number().saturated_into::<u64>();
+            let baseline = T::BaselineParameter::get();
             let state = StabilityState {
-                parameter: baseline,
-                history: vec![(now, 0, baseline, 0)],
+                current_parameter: baseline,
+                history: vec![StabilityRecord {
+                    timestamp,
+                    parameter: baseline,
+                    volatility: 0,
+                }],
             };
             <StabilityStateStorage<T>>::put(state);
             Ok(())
         }
 
-        /// Updates the stability parameter based on a given volatility signal.
+        /// Met à jour le paramètre de stabilité en fonction d'une mesure de volatilité.
         ///
-        /// The new stability parameter is calculated using a smoothing algorithm:
-        ///   new_parameter = current_parameter + (volatility_signal / smoothing_factor)
-        pub fn update_stability(volatility_signal: u32) -> DispatchResult {
-            ensure!(volatility_signal > 0, Error::<T>::InvalidVolatilitySignal);
+        /// Le nouveau paramètre est calculé comme suit :
+        /// `new_parameter = old_parameter + (volatility / smoothing_factor)`
+        #[pallet::weight(10_000)]
+        pub fn update_parameter(origin: OriginFor<T>, volatility: u32) -> DispatchResult {
+            // Ici, nous acceptons un appel signé (peut être remplacé par ensure_root selon la gouvernance).
+            ensure_signed(origin)?;
+            ensure!(volatility > 0, Error::<T>::InvalidVolatility);
+
             let mut state = <StabilityStateStorage<T>>::get();
-            let previous = state.parameter;
-            let adjustment = volatility_signal / T::StabilitySmoothingFactor::get();
-            let new_parameter = previous.saturating_add(adjustment);
-            let now = <frame_system::Pallet<T>>::block_number().saturated_into::<u64>();
-            state.history.push((now, previous, new_parameter, volatility_signal));
-            state.parameter = new_parameter;
+            let old_parameter = state.current_parameter;
+            let adjustment = volatility / T::SmoothingFactor::get();
+            let new_parameter = old_parameter.saturating_add(adjustment);
+            state.current_parameter = new_parameter;
+
+            let timestamp = <frame_system::Pallet<T>>::block_number().saturated_into::<u64>();
+            state.history.push(StabilityRecord {
+                timestamp,
+                parameter: new_parameter,
+                volatility,
+            });
             <StabilityStateStorage<T>>::put(state);
-            Self::deposit_event(Event::StabilityUpdated(previous, new_parameter, volatility_signal));
+
+            Self::deposit_event(Event::StabilityParameterUpdated(old_parameter, new_parameter, volatility));
             Ok(())
         }
     }
