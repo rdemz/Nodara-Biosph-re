@@ -5,7 +5,7 @@ authors = ["Your Name <your.email@example.com>"]
 edition = "2021"
 description = "Nodara BIOSPHÈRE QUANTIC – A next-generation adaptive blockchain platform with advanced security, scalability, and decentralized governance."
 license = "MIT"
-repository = "https://github.com/yourusername/nodara-biosphere-quantic"
+repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
 rust-version = "1.68.0"
 
 [dependencies]
@@ -54,6 +54,7 @@ members = [
     "pallets/nodara_predictive_guard",
     "pallets/nodara_reputation",
     "pallets/nodara_standards",
+    "pallets/bridge",
     "ci_cd",
     "cli",
     "deployment_and_operations",
@@ -64,5 +65,4 @@ members = [
     "monitoring_and_dashboard",
     "offchain_workers",
     "legal_and_compliance"
-    # Add additional members as necessary.
 ]
