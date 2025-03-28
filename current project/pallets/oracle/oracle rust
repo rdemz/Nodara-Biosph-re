@@ -1,0 +1,238 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+
+//! # Pallet Oracle & Récompenses pour Nodara
+//!
+//! Ce module intègre une solution oracle complète pour Nodara avec incitations financières.
+//! Il permet aux fournisseurs de s'enregistrer en réservant une caution, de soumettre des données,
+//! d'agréger ces données via une moyenne pondérée par réputation et de distribuer automatiquement
+//! les récompenses depuis un pool dédié. Le module est conçu pour être directement intégré dans le runtime Nodara.
+//!
+//! ## Fonctionnalités
+//! - Enregistrement de fournisseurs avec stake et réputation initiale.
+//! - Soumission de données numériques par des fournisseurs.
+//! - Agrégation des données par moyenne pondérée.
+//! - Distribution automatique des récompenses à partir d'un pool de fonds.
+//! - Fonction de financement du pool par des appels externes (ex. via gouvernance).
+
+use frame_support::{
+    dispatch::DispatchResult, pallet_prelude::*, traits::{Currency, ReservableCurrency, ExistenceRequirement},
+    transactional,
+};
+use frame_system::pallet_prelude::*;
+use sp_std::vec::Vec;
+use sp_runtime::traits::Zero;
+
+pub use pallet::*;
+
+#[frame_support::pallet]
+pub mod pallet {
+    use super::*;
+
+    pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
+    pub type BalanceOf<T> =
+        <<T as Config>::Currency as Currency<AccountIdOf<T>>>::Balance;
+
+    /// Configuration du pallet
+    #[pallet::config]
+    pub trait Config: frame_system::Config {
+        /// Type d’événement utilisé par le runtime.
+        type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+        /// Module monétaire pour la gestion des stakes et récompenses.
+        type Currency: ReservableCurrency<AccountIdOf<Self>>;
+        /// Montant minimal de stake requis pour l’enregistrement d’un fournisseur.
+        #[pallet::constant]
+        type ProviderStake: Get<BalanceOf<Self>>;
+        /// Pourcentage (en basis points) de pénalité appliqué sur une soumission erronée.
+        #[pallet::constant]
+        type PenaltyBasisPoints: Get<u32>;
+    }
+
+    #[pallet::pallet]
+    #[pallet::generate_store(pub(super) trait Store)]
+    pub struct Pallet<T>(_);
+
+    /// Informations d’un fournisseur.
+    #[derive(Encode, Decode, Clone, Default, PartialEq, RuntimeDebug, TypeInfo)]
+    pub struct ProviderInfo<Balance> {
+        /// Score de réputation (initialisé à 10).
+        pub reputation: u32,
+        /// Caution réservée lors de l’enregistrement.
+        pub stake: Balance,
+    }
+
+    /// Stockage des fournisseurs enregistrés : AccountId => ProviderInfo.
+    #[pallet::storage]
+    #[pallet::getter(fn providers)]
+    pub type Providers<T: Config> =
+        StorageMap<_, Blake2_128Concat, AccountIdOf<T>, ProviderInfo<BalanceOf<T>>, OptionQuery>;
+
+    /// Stockage temporaire des soumissions dans le cycle d’agrégation.
+    /// Chaque entrée est un tuple (fournisseur, valeur).
+    #[pallet::storage]
+    #[pallet::getter(fn submissions)]
+    pub type Submissions<T: Config> =
+        StorageValue<_, Vec<(AccountIdOf<T>, u128)>, ValueQuery>;
+
+    /// Dernière valeur agrégée et le numéro de block associé.
+    #[pallet::storage]
+    #[pallet::getter(fn last_aggregated)]
+    pub type LastAggregated<T: Config> =
+        StorageValue<_, (u128, T::BlockNumber), OptionQuery>;
+
+    /// Pool de récompenses accumulées (tokens destinés à être distribués aux fournisseurs).
+    #[pallet::storage]
+    #[pallet::getter(fn reward_pool)]
+    pub type RewardPool<T: Config> =
+        StorageValue<_, BalanceOf<T>, ValueQuery>;
+
+    #[pallet::event]
+    #[pallet::metadata(AccountIdOf<T> = "AccountId", BalanceOf<T> = "Balance")]
+    #[pallet::generate_deposit(pub(super) fn deposit_event)]
+    pub enum Event<T: Config> {
+        /// Un fournisseur vient de s’enregistrer.
+        ProviderRegistered(AccountIdOf<T>),
+        /// Un fournisseur a soumis une donnée.
+        DataSubmitted(AccountIdOf<T>, u128),
+        /// Agrégation effectuée : (valeur agrégée, block).
+        AggregatedValue(u128, T::BlockNumber),
+        /// Récompenses distribuées depuis le pool.
+        RewardsDistributed(BalanceOf<T>),
+    }
+
+    #[pallet::error]
+    pub enum Error<T> {
+        /// Le fournisseur est déjà enregistré.
+        AlreadyRegistered,
+        /// L’appelant n’est pas enregistré comme fournisseur.
+        NotRegistered,
+        /// Le solde du fournisseur est insuffisant pour le stake.
+        InsufficientStake,
+        /// Aucune soumission trouvée pour l’agrégation.
+        NoSubmissions,
+        /// Division par zéro (aucune pondération calculée).
+        ZeroTotalWeight,
+    }
+
+    #[pallet::call]
+    impl<T: Config> Pallet<T> {
+        /// Enregistrement d’un fournisseur.
+        /// L’appelant doit disposer d’un solde suffisant pour bloquer la caution.
+        #[pallet::weight(10_000)]
+        #[transactional]
+        pub fn register_provider(origin: OriginFor<T>) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            ensure!(
+                !Providers::<T>::contains_key(&who),
+                Error::<T>::AlreadyRegistered
+            );
+            let stake = T::ProviderStake::get();
+            T::Currency::reserve(&who, stake)
+                .map_err(|_| Error::<T>::InsufficientStake)?;
+            let provider_info = ProviderInfo {
+                reputation: 10,
+                stake,
+            };
+            Providers::<T>::insert(&who, provider_info);
+            Self::deposit_event(Event::ProviderRegistered(who));
+            Ok(())
+        }
+
+        /// Soumission d’une donnée par un fournisseur enregistré.
+        /// La valeur est enregistrée pour l’agrégation.
+        #[pallet::weight(10_000)]
+        #[transactional]
+        pub fn submit_data(origin: OriginFor<T>, value: u128) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            ensure!(Providers::<T>::contains_key(&who), Error::<T>::NotRegistered);
+
+            // Ici, on peut ajouter des vérifications de validité de la donnée.
+            // En cas d’erreur détectée, on appliquerait une pénalité (réduction de réputation et/ou prélèvement du stake).
+
+            Submissions::<T>::mutate(|subs| subs.push((who.clone(), value)));
+            // Mise à jour de la réputation en cas de soumission correcte.
+            Providers::<T>::mutate(&who, |provider| {
+                if let Some(info) = provider {
+                    info.reputation = info.reputation.saturating_add(1);
+                }
+            });
+            Self::deposit_event(Event::DataSubmitted(who, value));
+            Ok(())
+        }
+
+        /// Agrégation des données soumises via une moyenne pondérée par réputation.
+        /// Après agrégation, les soumissions sont réinitialisées et la distribution des récompenses est déclenchée.
+        #[pallet::weight(10_000)]
+        #[transactional]
+        pub fn aggregate_data(origin: OriginFor<T>) -> DispatchResult {
+            let _ = ensure_signed(origin)?;
+            let submissions = Submissions::<T>::get();
+            ensure!(!submissions.is_empty(), Error::<T>::NoSubmissions);
+
+            let mut total_weight: u128 = 0;
+            let mut weighted_sum: u128 = 0;
+
+            for (provider, value) in submissions.iter() {
+                if let Some(info) = Providers::<T>::get(provider) {
+                    let weight = info.reputation as u128;
+                    weighted_sum = weighted_sum.saturating_add(value.saturating_mul(weight));
+                    total_weight = total_weight.saturating_add(weight);
+                }
+            }
+
+            ensure!(total_weight > 0, Error::<T>::ZeroTotalWeight);
+            let aggregated_value = weighted_sum / total_weight;
+            let current_block = <frame_system::Pallet<T>>::block_number();
+            LastAggregated::<T>::put((aggregated_value, current_block));
+            Submissions::<T>::kill();
+            Self::deposit_event(Event::AggregatedValue(aggregated_value, current_block));
+
+            // Distribution des récompenses suite à l'agrégation.
+            Self::distribute_rewards()?;
+
+            Ok(())
+        }
+
+        /// Permet d'alimenter manuellement le pool de récompenses.
+        /// Cette fonction peut être appelée par une entité autorisée (ex. via gouvernance).
+        #[pallet::weight(10_000)]
+        #[transactional]
+        pub fn fund_reward_pool(origin: OriginFor<T>, amount: BalanceOf<T>) -> DispatchResult {
+            let _ = ensure_signed(origin)?;
+            // Pour simplifier, on ajoute directement le montant au pool.
+            RewardPool::<T>::mutate(|pool| *pool += amount);
+            Ok(())
+        }
+    }
+
+    /// Distribution automatique des récompenses aux fournisseurs en fonction de leur contribution pondérée.
+    impl<T: Config> Pallet<T> {
+        fn distribute_rewards() -> DispatchResult {
+            let submissions = Submissions::<T>::get();
+            ensure!(!submissions.is_empty(), Error::<T>::NoSubmissions);
+
+            let mut total_weight: u128 = 0;
+            let mut provider_weights: Vec<(AccountIdOf<T>, u128)> = Vec::new();
+
+            // Calcul du poids de chaque fournisseur ayant soumis des données dans ce cycle.
+            for (provider, _) in submissions.iter() {
+                if let Some(info) = Providers::<T>::get(provider) {
+                    let weight = info.reputation as u128;
+                    total_weight = total_weight.saturating_add(weight);
+                    provider_weights.push((provider.clone(), weight));
+                }
+            }
+            ensure!(total_weight > 0, Error::<T>::ZeroTotalWeight);
+
+            let pool = RewardPool::<T>::get();
+            for (provider, weight) in provider_weights.into_iter() {
+                let share = pool.saturating_mul(weight.into()) / total_weight.into();
+                T::Currency::deposit_creating(&provider, share);
+            }
+
+            // Réinitialisation du pool après distribution.
+            RewardPool::<T>::put(Zero::zero());
+            Self::deposit_event(Event::RewardsDistributed(pool));
+            Ok(())
+        }
+    }
+}
