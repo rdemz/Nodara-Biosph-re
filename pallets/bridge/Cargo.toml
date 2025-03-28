@@ -2,24 +2,20 @@
 name = "pallet-bridge"
 version = "0.1.0"
 authors = ["Votre Nom <votre.email@example.com>"]
-edition = "2018"
-publish = false
+edition = "2021"
+description = "Module de pont inter-chaînes pour Nodara BIOSPHÈRE QUANTIC."
+
+# Ce module est prévu pour être utilisé dans un environnement Substrate,
+# donc les dépendances suivantes sont indispensables.
 
 [dependencies]
-frame-support = { version = "4.0.0-dev", default-features = false }
-frame-system = { version = "4.0.0-dev", default-features = false }
-sp-runtime = { version = "4.0.0-dev", default-features = false }
-sp-std = { version = "4.0.0-dev", default-features = false }
-codec = { version = "4.0.0-dev", default-features = false }
-scale-info = { version = "2.0", default-features = false }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+frame-support = { version = "6.0.0", default-features = false }
+frame-system  = { version = "6.0.0", default-features = false }
+sp-runtime    = { version = "6.0.0", default-features = false }
+sp-std        = "6.0.0"
+parity-scale-codec = { version = "3.6.0", default-features = false }
+scale-info    = "2.3.0"  # Pour fournir des métadonnées type-safety
 
-[features]
-default = ["std"]
-std = [
-    "frame-support/std",
-    "frame-system/std",
-    "sp-runtime/std",
-    "sp-std/std",
-]
+[dev-dependencies]
+frame-benchmarking = { version = "6.0.0", default-features = false }
+sp-keyring         = "6.0.0"
