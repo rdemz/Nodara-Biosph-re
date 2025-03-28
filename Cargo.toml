@@ -8,10 +8,6 @@ license = "MIT"
 repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
 rust-version = "1.68.0"
 
-# Ajout de la section [lib] pour fournir une cible par défaut
-[lib]
-path = "src/lib.rs"
-
 [dependencies]
 sp-core = { version = "6.0.0", default-features = false }
 sp-runtime = { version = "6.0.0", default-features = false }
@@ -64,4 +60,7 @@ members = [
     "sdk",
     "risk_management",
     "bug_bounty_and_community",
-    "monitoring
+    "monitoring_and_dashboard",
+    "offchain_workers",
+    "legal_and_compliance"
+]
