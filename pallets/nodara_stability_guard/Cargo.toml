@@ -3,25 +3,22 @@ name = "nodara_stability_guard"
 version = "1.0.0"
 authors = ["Your Name <your.email@example.com>"]
 edition = "2021"
-description = "Nodara Stability Guard Module - Dynamic network stability management for Nodara BIOSPHÈRE QUANTIC."
+description = "Nodara Stability Guard - Dynamic Network Stability Management for Nodara BIOSPHÈRE QUANTIC"
 license = "MIT"
-repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
 
 [dependencies]
-sp-core = { version = "6.0.0", default-features = false }
-sp-runtime = { version = "6.0.0", default-features = false }
 frame-support = { version = "6.0.0", default-features = false }
 frame-system = { version = "6.0.0", default-features = false }
-codec = "6.0.0"
-scale-info = "2.3.0"
+sp-runtime = "6.0.0"
 sp-std = "6.0.0"
-log = "0.4"
-env_logger = "0.10"
-
-[dev-dependencies]
-frame-benchmarking = "6.0.0"
-sp-keyring = "6.0.0"
-rand = "0.8"
+parity-scale-codec = { version = "3.4.0", default-features = false }
+scale-info = "2.3.0"
 
 [features]
-default = []
+default = ["std"]
+std = [
+    "frame-support/std",
+    "frame-system/std",
+    "sp-runtime/std",
+    "sp-std/std",
+]
