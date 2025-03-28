@@ -6,38 +6,38 @@
 //! en émettant ou en brûlant des représentations sur Nodara. Il supporte une large gamme d’actifs (BNB, BTC, ETH, DOT, XRP, DOGE, SOL, LINK, SUI, AVAX, USDT, USDC, ADA, TRX, XLM, TON)
 //! et intègre un mécanisme de validation décentralisée (confirmations multi‑signatures) pour sécuriser les transferts.
 //!
-//! Les fonctionnalités incluent :
-//! - Un registre d’actifs supportés (enregistré en genèse) avec leurs métadonnées.
-//! - L’initiation d’une demande de transfert (avec indication de direction : vers Nodara ou depuis Nodara).
-//! - La confirmation par plusieurs validateurs.
-//! - La finalisation du transfert qui appelle le gestionnaire d’actifs pour mint ou burn les tokens représentatifs.
+//! Les fonctionnalités principales incluent :
+//! - Enregistrement d’un registre d’actifs supportés (défini en genèse) avec leurs métadonnées.
+//! - Initiation d’une demande de transfert (spécifiant la direction : vers Nodara ou depuis Nodara).
+//! - Validation par plusieurs validateurs avant finalisation.
+//! - Finalisation du transfert qui appelle le gestionnaire d’actifs pour mint ou burn les tokens représentatifs.
 //!
-//! Ce module est entièrement opérationnel et prêt à être déployé sur testnet.
+//! Ce module est conçu pour être déployé sur testnet et en production.
 
 use frame_support::{
-    dispatch::DispatchResult, pallet_prelude::*, traits::Currency,
+    dispatch::DispatchResult, pallet_prelude::*, traits::{Currency, Get},
     transactional,
 };
 use frame_system::pallet_prelude::*;
-use sp_std::vec::Vec;
 use sp_std::collections::btree_set::BTreeSet;
-
-pub use pallet::*;
+use sp_std::vec::Vec;
 
 /// Trait pour gérer le minting et le burning des tokens représentatifs sur Nodara.
 pub trait BridgeAssetManager<AccountId> {
-    /// Mint (crée) des tokens représentatifs pour l'actif spécifié et les crédite au compte `to`.
+    /// Crée (mint) des tokens représentatifs pour l’actif donné et les crédite au compte `to`.
     fn mint(asset: Vec<u8>, to: &AccountId, amount: u128) -> DispatchResult;
-    /// Burn (détruit) des tokens représentatifs pour l'actif spécifié en les retirant du compte `from`.
+    /// Détruit (burn) des tokens représentatifs pour l’actif donné en les retirant du compte `from`.
     fn burn(asset: Vec<u8>, from: &AccountId, amount: u128) -> DispatchResult;
 }
+
+pub use pallet::*;
 
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
     use sp_runtime::traits::Zero;
 
-    pub type AssetId = Vec<u8>; // Ex : b"BTC", b"ETH", etc.
+    pub type AssetId = Vec<u8>; // Par exemple : b"BTC", b"ETH", etc.
     pub type TransferId = u64;
 
     /// Métadonnées d'un actif supporté par le bridge.
@@ -46,10 +46,10 @@ pub mod pallet {
         pub name: Vec<u8>,
         pub symbol: Vec<u8>,
         pub decimals: u8,
-        pub source_chain: Vec<u8>, // Ex : b"BTC", b"ETH", b"ERC20", etc.
+        pub source_chain: Vec<u8>, // Exemple : b"BTC", b"ETH", b"ERC20", etc.
     }
 
-    /// Structure d'une demande de transfert inter‑chaînes.
+    /// Structure représentant une demande de transfert inter‑chaînes.
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
     pub struct TransferRequest<AccountId> {
         pub id: TransferId,
@@ -67,7 +67,7 @@ pub mod pallet {
     pub trait Config: frame_system::Config {
         /// Type d'événement utilisé par le runtime.
         type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
-        /// Module monétaire pour d'éventuelles opérations financières.
+        /// Module monétaire (pour d'éventuelles opérations financières, si nécessaire).
         type Currency: Currency<Self::AccountId>;
         /// Nombre minimum de confirmations requis pour finaliser un transfert.
         #[pallet::constant]
@@ -112,7 +112,7 @@ pub mod pallet {
 
     #[pallet::error]
     pub enum Error<T> {
-        /// L'actif n'est pas supporté par le bridge.
+        /// L’actif n’est pas supporté par le bridge.
         AssetNotSupported,
         /// La demande de transfert est introuvable.
         TransferNotFound,
@@ -128,12 +128,14 @@ pub mod pallet {
         #[pallet::weight(10_000)]
         pub fn register_asset(origin: OriginFor<T>, asset: AssetId, metadata: AssetMetadata) -> DispatchResult {
             let _ = ensure_signed(origin)?;
+            // Vous pouvez ajouter ici des vérifications supplémentaires, par exemple sur la taille ou la validité des métadonnées.
             SupportedAssets::<T>::insert(&asset, metadata);
             Self::deposit_event(Event::AssetRegistered(asset));
             Ok(())
         }
 
         /// Initie une demande de transfert inter‑chaînes.
+        ///
         /// `to_nodara` : true pour un transfert vers Nodara (verrouillage sur la source et mint sur Nodara),
         /// false pour un transfert inverse (burn sur Nodara et déverrouillage sur la source).
         #[pallet::weight(10_000)]
@@ -187,6 +189,7 @@ pub mod pallet {
         }
 
         /// Finalise le transfert une fois que le seuil de confirmations est atteint.
+        ///
         /// Pour un transfert vers Nodara, mint les tokens représentatifs sur le compte destination.
         /// Pour un transfert inverse, burn les tokens représentatifs depuis le compte source.
         #[pallet::weight(10_000)]
@@ -212,7 +215,8 @@ pub mod pallet {
         }
     }
 
-    // --- Configuration de Genèse pour pré‑enregistrer les actifs supportés ---
+    // --- Configuration de Genèse ---
+    /// Permet de pré‑enregistrer une liste d’actifs supportés par le bridge lors du lancement de la blockchain.
     #[pallet::genesis_config]
     pub struct GenesisConfig<T: Config> {
         pub initial_assets: Vec<(AssetId, AssetMetadata)>,
@@ -250,6 +254,124 @@ pub mod pallet {
             for (asset_id, metadata) in &self.initial_assets {
                 SupportedAssets::<T>::insert(asset_id, metadata);
             }
+        }
+    }
+    
+    // --- Tests Unitaires ---
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate as pallet_bridge;
+        use frame_support::{assert_ok, parameter_types, traits::OnFinalize};
+        use sp_core::H256;
+        use sp_runtime::{
+            testing::Header,
+            traits::{BlakeTwo256, IdentityLookup},
+        };
+        use frame_system as system;
+
+        type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+        type Block = frame_system::mocking::MockBlock<Test>;
+
+        frame_support::construct_runtime!(
+            pub enum Test where
+                Block = Block,
+                NodeBlock = Block,
+                UncheckedExtrinsic = UncheckedExtrinsic,
+            {
+                System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+                Bridge: pallet_bridge::{Pallet, Call, Storage, Event<T>},
+            }
+        );
+
+        parameter_types! {
+            pub const BlockHashCount: u64 = 250;
+            pub const RequiredConfirmations: u32 = 2;
+        }
+
+        impl system::Config for Test {
+            type BaseCallFilter = frame_support::traits::Everything;
+            type BlockWeights = ();
+            type BlockLength = ();
+            type DbWeight = ();
+            type RuntimeOrigin = system::mocking::Origin;
+            type RuntimeCall = ();
+            type Index = u64;
+            type BlockNumber = u64;
+            type Hash = H256;
+            type Hashing = BlakeTwo256;
+            type AccountId = u64;
+            type Lookup = IdentityLookup<Self::AccountId>;
+            type Header = Header;
+            type RuntimeEvent = ();
+            type BlockHashCount = BlockHashCount;
+            type Version = ();
+            type PalletInfo = ();
+            type AccountData = ();
+            type OnNewAccount = ();
+            type OnKilledAccount = ();
+            type SystemWeightInfo = ();
+            type SS58Prefix = ();
+            type OnSetCode = ();
+            type MaxConsumers = ();
+        }
+
+        // Pour simplifier les tests, nous créons un gestionnaire d'actifs fictif.
+        pub struct DummyAssetManager;
+        impl BridgeAssetManager<u64> for DummyAssetManager {
+            fn mint(asset: Vec<u8>, to: &u64, amount: u128) -> DispatchResult {
+                // Simulez ici le minting (pour le test, on ne fait rien)
+                Ok(())
+            }
+            fn burn(asset: Vec<u8>, from: &u64, amount: u128) -> DispatchResult {
+                // Simulez ici le burning (pour le test, on ne fait rien)
+                Ok(())
+            }
+        }
+
+        impl Config for Test {
+            type Event = ();
+            type Currency = ();
+            type RequiredConfirmations = RequiredConfirmations;
+            type AssetManager = DummyAssetManager;
+        }
+
+        #[test]
+        fn test_bridge_flow() {
+            // Test complet du flux de transfert inter-chaînes :
+            // 1. Enregistrement d'un actif
+            // 2. Initiation d'une demande de transfert
+            // 3. Confirmation du transfert par deux validateurs
+            // 4. Finalisation du transfert (mint ou burn)
+            System::set_block_number(1);
+            let asset_id = b"BTC".to_vec();
+            let metadata = AssetMetadata {
+                name: b"Bitcoin".to_vec(),
+                symbol: b"BTC".to_vec(),
+                decimals: 8,
+                source_chain: b"BTC".to_vec(),
+            };
+
+            // Enregistrer l'actif
+            assert_ok!(Bridge::register_asset(system::RawOrigin::Signed(1).into(), asset_id.clone(), metadata));
+
+            // Initier un transfert
+            let amount = 1_000_000u128;
+            assert_ok!(Bridge::initiate_transfer(
+                system::RawOrigin::Signed(1).into(),
+                asset_id.clone(),
+                amount,
+                2,
+                true
+            ));
+            let transfer_id = Bridge::next_transfer_id() - 1;
+
+            // Confirmer le transfert avec deux comptes (1 et 3)
+            assert_ok!(Bridge::confirm_transfer(system::RawOrigin::Signed(1).into(), transfer_id));
+            assert_ok!(Bridge::confirm_transfer(system::RawOrigin::Signed(3).into(), transfer_id));
+
+            // Finaliser le transfert (le mint sera appelé via le DummyAssetManager)
+            assert_ok!(Bridge::finalize_transfer(system::RawOrigin::Signed(1).into(), transfer_id));
         }
     }
 }
