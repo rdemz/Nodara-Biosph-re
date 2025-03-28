@@ -1,27 +1,32 @@
 [package]
 name = "nodara_id"
 version = "1.0.0"
-authors = ["Your Name <your.email@example.com>"]
 edition = "2021"
-description = "Nodara ID Module - Decentralized identity management and KYC verification for Nodara BIOSPHÈRE QUANTIC."
-license = "MIT"
-repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
+authors = ["Votre Nom <votre.email@example.com>"]
+description = "Nodara decentralized identity pallet for the Nodara BIOSPHÈRE QUANTIC platform."
 
 [dependencies]
-sp-core = { version = "6.0.0", default-features = false }
-sp-runtime = { version = "6.0.0", default-features = false }
+# Dépendances Substrate
 frame-support = { version = "6.0.0", default-features = false }
-frame-system = { version = "6.0.0", default-features = false }
-codec = "6.0.0"
-scale-info = "2.3.0"
-sp-std = "6.0.0"
-log = "0.4"
-env_logger = "0.10"
+frame-system  = { version = "6.0.0", default-features = false }
+sp-runtime    = { version = "6.0.0", default-features = false }
+sp-std        = { version = "6.0.0", default-features = false }
+# Pour la sérialisation/désérialisation
+parity-scale-codec = { version = "3.4.0", default-features = false }
+scale-info    = "2.3.0"
 
 [dev-dependencies]
-frame-benchmarking = "6.0.0"
-sp-keyring = "6.0.0"
-rand = "0.8"
+# Pour les tests unitaires et benchmarks
+frame-benchmarking = { version = "6.0.0", default-features = false }
+substrate-test-runtime = { version = "6.0.0", default-features = false }
 
 [features]
-default = []
+default = ["std"]
+std = [
+    "frame-support/std",
+    "frame-system/std",
+    "sp-runtime/std",
+    "sp-std/std",
+    "parity-scale-codec/std",
+    "scale-info/std",
+]
