@@ -16,7 +16,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup Rust Toolchain
+      - name: Set up Rust Toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -56,6 +56,6 @@ jobs:
 
       - name: Deploy to Testnet
         run: |
-          echo "Starting deployment to testnet..."
-          chmod +x ./deploy.sh
-          ./deploy.sh
+          echo "Deploying to testnet..."
+          chmod +x ./deployment_and_operations/deploy.sh
+          ./deployment_and_operations/deploy.sh
