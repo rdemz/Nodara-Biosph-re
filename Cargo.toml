@@ -56,7 +56,6 @@ members = [
     "ci_cd",
     "cli",
     "deployment_and_operation",
-    "docs",
     "sdk",
     "risk_management",
     "bug_bounty_and_community",
