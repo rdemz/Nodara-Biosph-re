@@ -1,14 +1,7 @@
 [package]
-name = "nodara_offchain_workers"
+name = "offchain_workers"
 version = "1.0.0"
-authors = ["Your Name <your.email@example.com>"]
 edition = "2021"
-description = "Offchain Workers for Nodara BIOSPHÈRE QUANTIC - Provides offchain processing functionalities such as parallel computation and data aggregation."
-license = "MIT"
-repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
 
-[dependencies]
-rayon = "1.5"
-sp-std = "6.0.0"
-
-[dev-dependencies]
+[lib]
+path = "src/lib.rs"
