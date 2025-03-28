@@ -1,0 +1,10 @@
+[package]
+name = "nodara_deployment_and_operations"
+version = "1.0.0"
+authors = ["Votre Nom <votre.email@example.com>"]
+edition = "2021"
+description = "Deployment and operations configuration for Nodara BIOSPHÈRE QUANTIC."
+license = "MIT"
+
+[lib]
+path = "src/lib.rs"
