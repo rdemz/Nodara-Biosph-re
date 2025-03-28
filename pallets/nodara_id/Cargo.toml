@@ -4,21 +4,18 @@ version = "1.0.0"
 edition = "2021"
 authors = ["Votre Nom <votre.email@example.com>"]
 description = "Nodara decentralized identity pallet for the Nodara BIOSPHÈRE QUANTIC platform."
+license = "MIT"
 
 [dependencies]
-# Dépendances Substrate
 frame-support = { version = "6.0.0", default-features = false }
 frame-system  = { version = "6.0.0", default-features = false }
 sp-runtime    = { version = "6.0.0", default-features = false }
 sp-std        = { version = "6.0.0", default-features = false }
-# Pour la sérialisation/désérialisation
 parity-scale-codec = { version = "3.4.0", default-features = false }
 scale-info    = "2.3.0"
 
 [dev-dependencies]
-# Pour les tests unitaires et benchmarks
 frame-benchmarking = { version = "6.0.0", default-features = false }
-substrate-test-runtime = { version = "6.0.0", default-features = false }
 
 [features]
 default = ["std"]
