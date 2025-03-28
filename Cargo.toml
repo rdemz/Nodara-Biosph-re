@@ -55,7 +55,7 @@ members = [
     "pallets/bridge",
     "ci_cd",
     "cli",
-    "deployment_and_operations",
+    "deployment_and_operation",
     "docs",
     "sdk",
     "risk_management",
