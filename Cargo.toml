@@ -9,7 +9,6 @@ repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
 rust-version = "1.68.0"
 
 [dependencies]
-# Core Substrate and blockchain dependencies
 sp-core = { version = "6.0.0", default-features = false }
 sp-runtime = { version = "6.0.0", default-features = false }
 sp-io = { version = "6.0.0", default-features = false }
@@ -18,7 +17,6 @@ frame-system = { version = "6.0.0", default-features = false }
 codec = "6.0.0"
 scale-info = "2.3.0"
 
-# Additional common dependencies
 sp-std = "6.0.0"
 log = "0.4"
 env_logger = "0.10"
@@ -41,7 +39,6 @@ panic = "abort"
 members = [
     "node",
     "runtime",
-    "pallets/bridge"
     "pallets/nodara_biosphere",
     "pallets/nodara_growth_model",
     "pallets/nodara_stability_guard",
