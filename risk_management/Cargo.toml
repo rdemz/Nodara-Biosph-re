@@ -1,10 +1,8 @@
 [package]
-name = "nodara_risk_management"
+name = "risk_management"
 version = "1.0.0"
-authors = ["Your Name <your.email@example.com>"]
 edition = "2021"
-description = "Risk Management documentation and scripts for Nodara BIOSPHÈRE QUANTIC."
-license = "MIT"
-repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
+description = "Module de gestion des risques pour Nodara BIOSPHÈRE QUANTIC."
 
-[dependencies]
+[lib]
+path = "src/lib.rs"
