@@ -12,9 +12,11 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, log};
 use frame_system::pallet_prelude::*;
 use sp_std::vec::Vec;
 use sp_runtime::RuntimeDebug;
+use parity_scale_codec::{Encode, Decode};
+use scale_info::TypeInfo;
 
 /// Enum representing the different phases of network operation.
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 pub enum BioPhase {
     Growth,
     Defense,
@@ -22,7 +24,7 @@ pub enum BioPhase {
 }
 
 /// Structure representing the complete state of the network.
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, Default)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, Default, TypeInfo)]
 pub struct BioState {
     pub current_phase: BioPhase,
     pub energy_level: u32,
@@ -36,6 +38,7 @@ pub mod pallet {
     use super::*;
 
     #[pallet::pallet]
+    #[pallet::generate_store(pub(super) trait Store)]
     pub struct Pallet<T>(_);
 
     #[pallet::config]
@@ -56,6 +59,7 @@ pub mod pallet {
         type SmoothingFactor: Get<u32>;
     }
 
+    /// Storage for the bio state.
     #[pallet::storage]
     #[pallet::getter(fn bio_state)]
     pub type BioStateStorage<T: Config> = StorageValue<_, BioState, ValueQuery>;
@@ -77,9 +81,13 @@ pub mod pallet {
         QuantumCalculationFailed,
     }
 
+    #[pallet::call]
     impl<T: Config> Pallet<T> {
         /// Initializes the bio state with baseline values.
-        pub fn initialize_state() -> DispatchResult {
+        #[pallet::weight(10_000)]
+        pub fn initialize_state(origin: OriginFor<T>) -> DispatchResult {
+            // Seul un appel provenant de la racine (Root) peut initialiser l'état.
+            ensure_root(origin)?;
             let now = <frame_system::Pallet<T>>::block_number().saturated_into::<u64>();
             let baseline_energy = T::BaselineEnergy::get();
             let baseline_flux = T::BaselineQuantumFlux::get();
@@ -96,11 +104,16 @@ pub mod pallet {
         }
 
         /// Updates the bio state based on an incoming signal and a cryptographic signature.
+        ///
         /// The new phase is determined by comparing the signal with predefined thresholds.
-        pub fn transition_phase(signal: u32, signature: Vec<u8>) -> DispatchResult {
+        #[pallet::weight(10_000)]
+        pub fn transition_phase(origin: OriginFor<T>, signal: u32, signature: Vec<u8>) -> DispatchResult {
+            // Seul un appel signé est autorisé.
+            ensure_signed(origin)?;
             ensure!(signal > 0, Error::<T>::InvalidSignal);
-            // Simulate signature verification.
+            // Simulation de vérification de signature.
             ensure!(!signature.is_empty(), Error::<T>::SignatureVerificationFailed);
+
             let current_state = <BioStateStorage<T>>::get();
             let new_phase = if signal > 100 {
                 BioPhase::Growth
@@ -109,11 +122,11 @@ pub mod pallet {
             } else {
                 BioPhase::Mutation
             };
-            let new_energy = signal.saturating_mul(10); // Example calculation
+            let new_energy = signal.saturating_mul(10); // Exemple de calcul
             let new_quantum_flux = (signal.saturating_mul(signal)) / T::SmoothingFactor::get();
             let now = <frame_system::Pallet<T>>::block_number().saturated_into::<u64>();
 
-            // Update history and state
+            // Mise à jour de l'historique et de l'état.
             let mut new_history = current_state.history.clone();
             new_history.push((now, new_phase.clone(), new_energy, new_quantum_flux));
             let updated_state = BioState {
