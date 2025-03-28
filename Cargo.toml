@@ -1,15 +1,18 @@
 [package]
 name = "nodara-biosphere-quantic"
 version = "1.0.0"
-authors = ["Votre Nom <votre.email@example.com>"]
+authors = ["Your Name <your.email@example.com>"]
 edition = "2021"
-description = "Nodara BIOSPHÈRE QUANTIC – Une plateforme blockchain de nouvelle génération, adaptative, sécurisée et gouvernée de manière décentralisée."
+description = "Nodara BIOSPHÈRE QUANTIC – A next-generation adaptive blockchain platform with advanced security, scalability, and decentralized governance."
 license = "MIT"
 repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
 rust-version = "1.68.0"
 
+# Ajout de la section [lib] pour fournir une cible par défaut
+[lib]
+path = "src/lib.rs"
+
 [dependencies]
-# Dépendances partagées pour l'ensemble du projet
 sp-core = { version = "6.0.0", default-features = false }
 sp-runtime = { version = "6.0.0", default-features = false }
 sp-io = { version = "6.0.0", default-features = false }
@@ -17,6 +20,7 @@ frame-support = { version = "6.0.0", default-features = false }
 frame-system = { version = "6.0.0", default-features = false }
 codec = "6.0.0"
 scale-info = "2.3.0"
+
 sp-std = "6.0.0"
 log = "0.4"
 env_logger = "0.10"
@@ -39,7 +43,6 @@ panic = "abort"
 members = [
     "node",
     "runtime",
-    "pallets/bridge"
     "pallets/nodara_biosphere",
     "pallets/nodara_growth_model",
     "pallets/nodara_stability_guard",
@@ -61,7 +64,4 @@ members = [
     "sdk",
     "risk_management",
     "bug_bounty_and_community",
-    "monitoring_and_dashboard",
-    "offchain_workers",
-    "legal_and_compliance"
-]
+    "monitoring
