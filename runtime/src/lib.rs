@@ -3,14 +3,15 @@
 
 //! # Nodara BIOSPHÈRE QUANTIC Runtime - Legendary Edition
 //!
-//! This runtime forms the backbone of Nodara BIOSPHÈRE QUANTIC. It integrates all the core pallets into a single,
-//! cohesive blockchain environment. The runtime is built on Substrate and leverages advanced security and performance
+//! This runtime forms the backbone of Nodara BIOSPHÈRE QUANTIC. It integrates all the core pallets
+//! (Biosphere, GrowthModel, StabilityGuard, LiquidityFlow, ReserveFund, RewardEngine, ID, Marketplace,
+//! IoTBridge, Interop, PredictiveGuard, Reputation, Standards, POW) along with a dedicated Bridge module
+//! for inter-chain interoperability. Built on Substrate, it leverages advanced security and performance
 //! optimizations to ensure that the network operates at legendary levels.
 
 use sp_runtime::{
     traits::{BlakeTwo256, Block as BlockT, IdentityLookup},
-    create_runtime_str, generic,
-    RuntimeVersion,
+    create_runtime_str, generic, RuntimeVersion,
 };
 use sp_core::OpaqueMetadata;
 use frame_support::{
@@ -55,10 +56,10 @@ construct_runtime!(
         // System support
         System: system::{Pallet, Call, Config, Storage, Event<T>},
 
-        // Timestamp for block time
+        // Timestamp for block time management
         Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 
-        // Integration of Nodara pallets
+        // Nodara core modules
         Biosphere: nodara_biosphere::{Pallet, Call, Storage, Event<T>},
         GrowthModel: nodara_growth_model::{Pallet, Call, Storage, Event<T>},
         StabilityGuard: nodara_stability_guard::{Pallet, Call, Storage, Event<T>},
@@ -73,6 +74,9 @@ construct_runtime!(
         Reputation: nodara_reputation::{Pallet, Call, Storage, Event<T>},
         Standards: nodara_standards::{Pallet, Call, Storage, Event<T>},
         POW: nodara_pow::{Pallet, Call, Storage, Event<T>},
+
+        // *** Nouveau module Bridge Inter‑chaînes intégré ***
+        Bridge: pallet_bridge::{Pallet, Call, Storage, Event<T>},
     }
 );
 
@@ -84,5 +88,5 @@ pub mod opaque {
     pub type Signature = sp_runtime::MultiSignature;
 }
 
-// Metadata for the runtime
+// Metadata for the runtime (used for node interface)
 pub const OPAQUE_METADATA: OpaqueMetadata = OpaqueMetadata::new(sp_runtime::OpaqueExtrinsic::default().encode());
