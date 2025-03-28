@@ -1,0 +1,8 @@
+[package]
+name = "offchain_workers"
+version = "1.0.0"
+edition = "2021"
+
+[[bin]]
+name = "offchain_workers"
+path = "src/main.rs"
