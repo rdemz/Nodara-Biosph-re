@@ -1,0 +1,24 @@
+[package]
+name = "legal_and_compliance"
+version = "1.0.0"
+authors = ["Your Name <your.email@example.com>"]
+edition = "2021"
+description = "Legal and Compliance module for Nodara BIOSPHÈRE QUANTIC. This module implements regulatory compliance, legal verification, and audit logging for the network."
+license = "MIT"
+
+[dependencies]
+frame-support = { version = "6.0.0", default-features = false }
+frame-system = { version = "6.0.0", default-features = false }
+sp-runtime = "6.0.0"
+sp-std = "6.0.0"
+codec = "6.0.0"
+scale-info = "2.3.0"
+
+[features]
+default = ["std"]
+std = [
+    "frame-support/std",
+    "frame-system/std",
+    "sp-runtime/std",
+    "sp-std/std",
+]
