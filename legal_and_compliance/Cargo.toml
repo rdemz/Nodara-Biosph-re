@@ -12,15 +12,10 @@ categories = ["cryptography::identity", "finance", "blockchain"]
 publish = false
 
 [dependencies]
-# Substrate FRAME dependencies
 frame-support = { version = "6.0.0", default-features = false }
 frame-system = { version = "6.0.0", default-features = false }
-
-# Substrate primitives
 sp-runtime = { version = "6.0.0", default-features = false }
 sp-std = { version = "6.0.0", default-features = false }
-
-# Encoding and metadata
 codec = { version = "6.0.0", default-features = false, features = ["derive"] }
 scale-info = { version = "2.3.0", default-features = false, features = ["derive"] }
 
@@ -44,4 +39,3 @@ runtime-benchmarks = [
     "frame-support/runtime-benchmarks",
     "frame-system/runtime-benchmarks",
 ]
-
