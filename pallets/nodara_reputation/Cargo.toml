@@ -5,17 +5,19 @@ edition = "2021"
 authors = ["Votre Nom <votre.email@example.com>"]
 description = "Nodara Reputation Module for Nodara BIOSPHÈRE QUANTIC: Manages reputation scores and audit logs."
 license = "MIT"
+repository = "https://github.com/rdemz/Nodara-Biosph-re"
+readme = "README.md"
 
 [dependencies]
-frame-support = { version = "6.0.0", default-features = false }
-frame-system  = { version = "6.0.0", default-features = false }
-sp-runtime    = { version = "6.0.0", default-features = false }
-sp-std        = { version = "6.0.0", default-features = false }
-parity-scale-codec = { version = "3.4.0", default-features = false }
-scale-info    = "2.3.0"
+frame-support    = { version = "30.0.0", default-features = false }
+frame-system     = { version = "30.0.0", default-features = false }
+sp-runtime       = { version = "30.0.0", default-features = false }
+sp-std           = { version = "10.0.0", default-features = false }
+parity-scale-codec = { version = "3.6.1", default-features = false }
+scale-info       = "2.3.0"
 
 [dev-dependencies]
-frame-benchmarking = { version = "6.0.0", default-features = false }
+frame-benchmarking = { version = "30.0.0", default-features = false }
 
 [features]
 default = ["std"]
