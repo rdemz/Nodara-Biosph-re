@@ -14,6 +14,7 @@ members = [
 
     # Pallets
     "pallets/bridge",
+    "pallets/legal_and_compliance",
     "pallets/nodara_biosphere",
     "pallets/nodara_growth_model",
     "pallets/nodara_id",
@@ -50,3 +51,6 @@ sp-runtime = "30.0.0"
 sp-std = "10.0.0"
 frame-support = "30.0.0"
 frame-system = "30.0.0"
+
+[patch.crates-io]
+schnorrkel = "=0.9.1"
