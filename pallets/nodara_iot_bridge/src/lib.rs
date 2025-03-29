@@ -171,4 +171,122 @@ pub mod pallet {
             1_640_000_000
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use frame_support::{assert_err, assert_ok, parameter_types};
+        use sp_core::H256;
+        use sp_runtime::{
+            traits::{BlakeTwo256, IdentityLookup},
+            testing::Header,
+        };
+        use frame_system as system;
+
+        type UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
+        type Block = system::mocking::MockBlock<Test>;
+
+        frame_support::construct_runtime!(
+            pub enum Test where
+                Block = Block,
+                NodeBlock = Block,
+                UncheckedExtrinsic = UncheckedExtrinsic,
+            {
+                System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+                IotBridgeModule: Pallet,
+            }
+        );
+
+        parameter_types! {
+            pub const BlockHashCount: u64 = 250;
+            pub const MaxPayloadLength: u32 = 512;
+            pub const BaseTimeout: u64 = 300,
+        }
+
+        impl system::Config for Test {
+            type BaseCallFilter = frame_support::traits::Everything;
+            type BlockWeights = ();
+            type BlockLength = ();
+            type DbWeight = ();
+            type RuntimeOrigin = system::mocking::Origin;
+            type RuntimeCall = Call;
+            type Index = u64;
+            type BlockNumber = u64;
+            type Hash = H256;
+            type Hashing = BlakeTwo256;
+            type AccountId = u64;
+            type Lookup = IdentityLookup<Self::AccountId>;
+            type Header = Header;
+            type RuntimeEvent = ();
+            type BlockHashCount = BlockHashCount;
+            type Version = ();
+            type PalletInfo = ();
+            type AccountData = ();
+            type OnNewAccount = ();
+            type OnKilledAccount = ();
+            type SystemWeightInfo = ();
+            type SS58Prefix = ();
+            type OnSetCode = ();
+            type MaxConsumers = ();
+        }
+
+        impl Config for Test {
+            type RuntimeEvent = ();
+            type MaxPayloadLength = MaxPayloadLength;
+            type BaseTimeout = BaseTimeout;
+        }
+
+        #[test]
+        fn submit_iot_data_should_work() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let id = 1;
+            let payload = b"Test IoT data".to_vec();
+            let device_id = b"Device123".to_vec();
+            let signature = b"ValidSignature".to_vec();
+            assert_ok!(IotBridgeModule::submit_iot_data(origin, id, payload.clone(), device_id, signature));
+            // Vérification: le record doit être présent dans le stockage.
+            let record = IotBridgeModule::iot_data(id).expect("IoT record should be stored");
+            assert_eq!(record.payload, payload);
+        }
+
+        #[test]
+        fn submit_iot_data_should_fail_if_payload_too_long() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let id = 2;
+            let payload = vec![0u8; (MaxPayloadLength::get() + 1) as usize];
+            let device_id = b"Device123".to_vec();
+            let signature = b"Signature".to_vec();
+            assert_err!(
+                IotBridgeModule::submit_iot_data(origin, id, payload, device_id, signature),
+                Error::<Test>::PayloadTooLong
+            );
+        }
+
+        #[test]
+        fn submit_iot_data_should_fail_if_device_id_empty() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let id = 3;
+            let payload = b"Valid payload".to_vec();
+            let device_id = Vec::new();
+            let signature = b"Signature".to_vec();
+            assert_err!(
+                IotBridgeModule::submit_iot_data(origin, id, payload, device_id, signature),
+                Error::<Test>::InvalidDeviceId
+            );
+        }
+
+        #[test]
+        fn update_config_should_work() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let new_config = b"New IoT Config".to_vec();
+            let details = b"Config update details".to_vec();
+            assert_ok!(IotBridgeModule::update_config(origin, new_config.clone(), details.clone()));
+            // Vérification: l'historique doit contenir l'entrée de mise à jour de configuration.
+            let history = IotBridgeModule::iot_history();
+            let config_updates: Vec<_> = history.into_iter().filter(|(_, id, op, _)| {
+                *id == 0 && op == b"ConfigUpdate".to_vec()
+            }).collect();
+            assert!(!config_updates.is_empty());
+        }
+    }
 }
