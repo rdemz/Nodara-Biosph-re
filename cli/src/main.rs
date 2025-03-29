@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
-use std::process;
 use std::error::Error;
+use tokio::time::{sleep, Duration};
+use tracing::{info, error};
 
 /// Nodara CLI - Legendary Edition
 ///
@@ -66,51 +67,130 @@ enum AdminCommands {
     Logs,
 }
 
+/// Simulated async RPC call to submit a proposal.
+async fn async_submit_proposal(description: &str, parameter: &str, value: &str) -> Result<String, Box<dyn Error>> {
+    info!("Submitting proposal via async RPC...");
+    // Simuler un délai de 2 secondes
+    sleep(Duration::from_secs(2)).await;
+    // Retour dummy
+    Ok(format!("PROPOSAL_{}", description.len() + parameter.len() + value.len()))
+}
+
+/// Simulated async RPC call to vote on a proposal.
+async fn async_vote_proposal(proposal_id: &str, vote: bool) -> Result<(), Box<dyn Error>> {
+    info!("Voting on proposal {} via async RPC...", proposal_id);
+    sleep(Duration::from_secs(1)).await;
+    Ok(())
+}
+
+/// Simulated async RPC call to execute a proposal.
+async fn async_execute_proposal(proposal_id: &str) -> Result<(), Box<dyn Error>> {
+    info!("Executing proposal {} via async RPC...", proposal_id);
+    sleep(Duration::from_secs(1)).await;
+    Ok(())
+}
+
+/// Simulated async RPC call to query network status.
+async fn async_query_status() -> Result<String, Box<dyn Error>> {
+    info!("Querying network status via async RPC...");
+    sleep(Duration::from_secs(1)).await;
+    Ok("Network is fully synchronized. Block Height: 123456".into())
+}
+
+/// Simulated async RPC call for administrative restart.
+async fn async_restart_node() -> Result<(), Box<dyn Error>> {
+    info!("Restarting node via async RPC...");
+    sleep(Duration::from_secs(3)).await;
+    Ok(())
+}
+
+/// Simulated async RPC call to fetch node logs.
+async fn async_fetch_logs() -> Result<String, Box<dyn Error>> {
+    info!("Fetching node logs via async RPC...");
+    sleep(Duration::from_secs(2)).await;
+    Ok("Latest logs: [INFO] Node operational, [WARN] High memory usage".into())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    // Configure the logger
+    tracing_subscriber::fmt::init();
+
     let cli = Cli::parse();
 
     if cli.verbose {
-        println!("Verbose mode enabled.");
+        info!("Verbose mode enabled.");
     }
 
     match &cli.command {
         Commands::Governance { subcommand } => match subcommand {
             GovernanceCommands::Submit { description, parameter, value } => {
-                // Replace with actual async RPC call to submit governance proposal
-                println!("Submitting proposal: '{}' to update '{}' to '{}'", description, parameter, value);
-                // Simulated response
-                println!("Proposal submitted successfully with ID: PROPOSAL_123");
+                info!("Submitting governance proposal...");
+                match async_submit_proposal(description, parameter, value).await {
+                    Ok(proposal_id) => {
+                        println!("Proposal submitted successfully with ID: {}", proposal_id);
+                    }
+                    Err(e) => {
+                        error!("Failed to submit proposal: {}", e);
+                    }
+                }
             }
             GovernanceCommands::Vote { proposal_id, vote } => {
-                // Replace with actual async RPC call to vote on proposal
-                println!("Voting on proposal {}: {}", proposal_id, if *vote { "Yes" } else { "No" });
-                // Simulated response
-                println!("Vote recorded successfully.");
+                info!("Voting on proposal {}...", proposal_id);
+                match async_vote_proposal(proposal_id, *vote).await {
+                    Ok(()) => {
+                        println!("Vote recorded successfully.");
+                    }
+                    Err(e) => {
+                        error!("Failed to record vote: {}", e);
+                    }
+                }
             }
             GovernanceCommands::Execute { proposal_id } => {
-                // Replace with actual async RPC call to execute proposal
-                println!("Executing proposal with ID: {}", proposal_id);
-                // Simulated response
-                println!("Proposal executed successfully.");
+                info!("Executing proposal {}...", proposal_id);
+                match async_execute_proposal(proposal_id).await {
+                    Ok(()) => {
+                        println!("Proposal executed successfully.");
+                    }
+                    Err(e) => {
+                        error!("Failed to execute proposal: {}", e);
+                    }
+                }
             }
         },
         Commands::Status => {
-            // Replace with actual async RPC call to query network status
-            println!("Fetching network status...");
-            // Simulated response
-            println!("Network is fully synchronized. Block Height: 123456");
+            info!("Querying network status...");
+            match async_query_status().await {
+                Ok(status) => {
+                    println!("{}", status);
+                }
+                Err(e) => {
+                    error!("Failed to query network status: {}", e);
+                }
+            }
         }
         Commands::Admin { subcommand } => match subcommand {
             AdminCommands::Restart => {
-                println!("Restarting the Nodara node...");
-                // Simulated response
-                println!("Node restarted successfully.");
+                info!("Restarting node...");
+                match async_restart_node().await {
+                    Ok(()) => {
+                        println!("Node restarted successfully.");
+                    }
+                    Err(e) => {
+                        error!("Failed to restart node: {}", e);
+                    }
+                }
             }
             AdminCommands::Logs => {
-                println!("Fetching node logs...");
-                // Simulated response
-                println!("Displaying latest node logs...");
+                info!("Fetching node logs...");
+                match async_fetch_logs().await {
+                    Ok(logs) => {
+                        println!("{}", logs);
+                    }
+                    Err(e) => {
+                        error!("Failed to fetch node logs: {}", e);
+                    }
+                }
             }
         },
     }
