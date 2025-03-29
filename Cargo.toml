@@ -1,63 +1,57 @@
 [workspace]
-members = [
-    "pallets/*",
-    "runtime",
-    "node",
-    "cli",
-    "tools/*"
-]
 resolver = "2"
+members = [
+    "cli",
+    "ci_cd",
+    "deployment_and_operation",
+    "legal_and_compliance",
+    "monitoring_and_dashboard",
+    "node",
+    "offchain_workers",
+    "bug_bounty_and_community",
+    "docs",
+    "sdk",
+    "runtime",
+
+    # Pallets
+    "pallets/bridge",
+    "pallets/legal_and_compliance",
+    "pallets/nodara_biosphere",
+    "pallets/nodara_growth_model",
+    "pallets/nodara_id",
+    "pallets/nodara_interop",
+    "pallets/nodara_iot_bridge",
+    "pallets/nodara_liquidity_flow",
+    "pallets/nodara_marketplace",
+    "pallets/nodara_pow",
+    "pallets/nodara_predictive_guard",
+    "pallets/nodara_reputation",
+    "pallets/nodara_reserve_fund",
+    "pallets/nodara_reward_engine",
+    "pallets/nodara_stability_guard",
+    "pallets/nodara_standards",
+
+    # Outils
+    "agent",
+    "current project/pallets/oracle",
+    "risk_management"
+]
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.76"
-license = "Apache-2.0"
-authors = ["Nodara BIOSPHERE Core Team"]
-repository = "https://github.com/Nodara/Nodara-BIOSPHERE"
-homepage = "https://nodara.org"
-description = "Nodara BIOSPHERE QUANTIC – Living Blockchain System"
-keywords = ["substrate", "blockchain", "biosphere", "quantum", "ai"]
-categories = ["cryptography::cryptocurrencies", "wasm", "blockchain"]
+license = "MIT"
+rust-version = "1.72"
 
 [workspace.dependencies]
-sp-core = { version = "27.0.0", default-features = false }
-sp-application-crypto = { version = "27.0.0", default-features = false }
-sp-runtime = { version = "27.0.0", default-features = false }
-sp-io = { version = "27.0.0", default-features = false }
-
-substrate-bip39 = { version = "0.4.1", default-features = false }
-schnorrkel = { version = "0.10.2", default-features = false }
-
-serde = { version = "1.0.197", features = ["derive"] }
-serde_json = "1.0.114"
-hex = "0.4.3"
-log = "0.4.21"
-env_logger = "0.10.1"
-thiserror = "1.0"
-cfg-if = "1.0"
-rand = "0.8.5"
-blake2 = "0.10.6"
-sha2 = "0.10.8"
-lazy_static = "1.4.0"
-tempfile = "3.10.1"
-clap = { version = "4.5.1", features = ["derive"] }
-
-[patch.crates-io]
-schnorrkel = { version = "0.10.2", package = "schnorrkel" }
-substrate-bip39 = { version = "0.4.1", package = "substrate-bip39" }
-
-[features]
-default = ["std"]
-std = [
-    "sp-core/std",
-    "sp-runtime/std",
-    "sp-io/std",
-    "sp-application-crypto/std",
-    "substrate-bip39/std",
-    "serde/std",
-    "schnorrkel/std",
-]
-
-runtime-benchmarks = [
-    "std"
-]
+# Dépendances partagées globales
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
+log = "0.4"
+env_logger = "0.10"
+futures = "0.3"
+sp-runtime = "30.0.0"
+sp-std = "10.0.0"
+frame-support = "30.0.0"
+frame-system = "30.0.0"
