@@ -13,7 +13,7 @@ name = "monitoring_and_dashboard"
 path = "src/main.rs"
 
 [dependencies]
-hyper = "0.14"
+hyper = { version = "0.14", features = ["server"] }
 prometheus = "0.14"
 lazy_static = "1.4"
 env_logger = "0.10"
