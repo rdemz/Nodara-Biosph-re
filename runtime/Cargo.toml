@@ -10,12 +10,17 @@ readme = "README.md"
 rust-version = "1.72.0"
 
 [dependencies]
-sp-core = { version = "30.0.0", default-features = false }
-sp-runtime = { version = "30.0.0", default-features = false }
-frame-support = { version = "30.0.0", default-features = false }
-frame-system = { version = "30.0.0", default-features = false }
-sp-api = { version = "30.0.0", default-features = false }
-log = "0.4"
-env_logger = "0.10"
+# Core and runtime dependencies
+sp-core            = { version = "30.0.0", default-features = false }
+sp-runtime         = { version = "30.0.0", default-features = false }
+sp-api             = { version = "30.0.0", default-features = false }
+sp-version         = { version = "30.0.0", default-features = false }
+frame-support      = { version = "30.0.0", default-features = false }
+frame-system       = { version = "30.0.0", default-features = false }
 parity-scale-codec = { version = "3.6.1", default-features = false }
-sp-version = "30.0.0"
+log                = "0.4"
+env_logger         = "0.10"
+
+# Optional pallets for a minimal runtime
+pallet-timestamp   = { version = "30.0.0", default-features = false }
+pallet-balances    = { version = "30.0.0", default-features = false }
