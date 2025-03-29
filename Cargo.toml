@@ -50,6 +50,3 @@ sp-runtime = "30.0.0"
 sp-std = "10.0.0"
 frame-support = "30.0.0"
 frame-system = "30.0.0"
-
-[patch.crates-io]
-schnorrkel = { git = "https://github.com/w3f/schnorrkel.git", branch = "0.9" }
