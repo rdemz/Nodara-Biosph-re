@@ -1,0 +1,71 @@
+
+---
+
+### Cargo.toml
+
+```toml
+[package]
+name = "nodara-runtime"
+version = "0.1.0"
+authors = ["Votre Nom <votre.email@example.com>"]
+edition = "2021"
+description = "Runtime for Nodara BIOSPHÈRE QUANTIC, integrating all pallets for a complete and production-ready blockchain."
+license = "Apache-2.0"
+repository = "https://github.com/votre-repo/nodara-runtime"
+
+[dependencies]
+# Substrate FRAME dependencies
+sp-core = { version = "6.0.0", default-features = false }
+sp-std = { version = "6.0.0", default-features = false }
+sp-runtime = { version = "6.0.0", default-features = false }
+sp-api = { version = "6.0.0", default-features = false }
+sp-version = { version = "6.0.0", default-features = false }
+
+frame-support = { version = "6.0.0", default-features = false }
+frame-system = { version = "6.0.0", default-features = false }
+
+# Consensus and Session Pallets
+pallet-timestamp = { version = "6.0.0", default-features = false }
+pallet-aura = { version = "6.0.0", default-features = false }
+pallet-grandpa = { version = "6.0.0", default-features = false }
+pallet-session = { version = "6.0.0", default-features = false }
+
+# Your custom pallets (assurez-vous de les inclure dans le workspace ou via path)
+pallet-bridge = { path = "pallets/pallet-bridge", default-features = false }
+nodara-biosphere = { path = "pallets/nodara-biosphere", default-features = false }
+nodara-growth = { path = "pallets/nodara-growth", default-features = false }
+nodara-id = { path = "pallets/nodara-id", default-features = false }
+nodara-interop = { path = "pallets/nodara-interop", default-features = false }
+nodara-iot = { path = "pallets/nodara-iot", default-features = false }
+nodara-liquidity-flow = { path = "pallets/nodara-liquidity-flow", default-features = false }
+nodara-reward-engine = { path = "pallets/nodara-reward-engine", default-features = false }
+nodara-stability-guard = { path = "pallets/nodara-stability-guard", default-features = false }
+nodara-standards = { path = "pallets/nodara-standards", default-features = false }
+nodara-pow = { path = "pallets/nodara-pow", default-features = false }
+nodara-predictive-guard = { path = "pallets/nodara-predictive-guard", default-features = false }
+nodara-reputation = { path = "pallets/nodara-reputation", default-features = false }
+nodara-reserve-fund = { path = "pallets/nodara-reserve-fund", default-features = false }
+nodara-marketplace = { path = "pallets/nodara-marketplace", default-features = false }
+
+# Dependencies for runtime API and encoding.
+parity-scale-codec = { version = "3.4.0", default-features = false }
+scale-info = { version = "2.3.0", default-features = false }
+
+[dev-dependencies]
+# Tools pour le développement et les tests.
+sp-keyring = "6.0.0"
+substrate-test-runtime-client = "6.0.0"
+
+[features]
+default = ["std"]
+std = [
+    "sp-core/std",
+    "sp-std/std",
+    "sp-runtime/std",
+    "frame-support/std",
+    "frame-system/std",
+    "pallet-timestamp/std",
+    "pallet-aura/std",
+    "pallet-grandpa/std",
+    "pallet-session/std",
+]
