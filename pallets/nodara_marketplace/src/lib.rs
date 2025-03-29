@@ -176,7 +176,7 @@ pub mod pallet {
             let asset = Asset {
                 id: asset_id,
                 metadata: metadata.clone(),
-                owner: who.into(), // Using u64 conversion; in production, use T::AccountId.
+                owner: who.into(), // In production, use T::AccountId.
             };
             <Assets<T>>::insert(asset_id, asset);
             Self::deposit_event(Event::AssetRegistered(asset_id, who.into()));
@@ -230,7 +230,7 @@ pub mod pallet {
             let _sender = ensure_signed(origin)?;
             ensure!(<BuyOrders<T>>::contains_key(&trade.buy_order_id), Error::<T>::OrderNotFound);
             ensure!(<SellOrders<T>>::contains_key(&trade.sell_order_id), Error::<T>::OrderNotFound);
-            // For simplicity, we assume a direct match and remove the orders.
+            // For simplicity, assume a direct match and remove the orders.
             <BuyOrders<T>>::remove(trade.buy_order_id);
             <SellOrders<T>>::remove(trade.sell_order_id);
             <TradesHistory<T>>::mutate(|history| history.push(trade.clone()));
@@ -262,7 +262,7 @@ pub mod pallet {
         type Block = system::mocking::MockBlock<Test>;
 
         frame_support::construct_runtime!(
-            pub enum Test where
+            pub enum Test where 
                 Block = Block,
                 NodeBlock = Block,
                 UncheckedExtrinsic = UncheckedExtrinsic,
@@ -319,7 +319,6 @@ pub mod pallet {
             assert_ok!(MarketplaceModule::register_asset(origin, asset_id, metadata.clone()));
             let asset = MarketplaceModule::assets(asset_id).expect("Asset should be registered");
             assert_eq!(asset.metadata, metadata);
-            // Check event emission (if event testing is desired)
         }
 
         #[test]
