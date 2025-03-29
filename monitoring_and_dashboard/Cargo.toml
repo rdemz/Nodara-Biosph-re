@@ -2,8 +2,12 @@
 name = "monitoring_and_dashboard"
 version = "1.0.0"
 edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT"
+description = "Monitoring and dashboard module for Nodara BIOSPHÈRE."
+repository = "https://github.com/rdemz/Nodara-Biosph-re"
+readme = "README.md"
 
 [[bin]]
 name = "monitoring_and_dashboard"
 path = "src/main.rs"
-
