@@ -1,18 +1,17 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-//! # Pallet Bridge Inter‑chaînes pour Nodara
+//! # Pallet Bridge Inter‑chaînes pour Nodara - Extreme Edition
 //!
-//! Ce module permet le transfert inter‑chaînes en verrouillant des actifs sur une blockchain source et
+//! Ce module gère le transfert inter‑chaînes en verrouillant des actifs sur une blockchain source et
 //! en émettant ou en brûlant des représentations sur Nodara. Il supporte une large gamme d’actifs (BNB, BTC, ETH, DOT, XRP, DOGE, SOL, LINK, SUI, AVAX, USDT, USDC, ADA, TRX, XLM, TON)
 //! et intègre un mécanisme de validation décentralisée (confirmations multi‑signatures) pour sécuriser les transferts.
 //!
-//! Les fonctionnalités principales incluent :
-//! - Enregistrement d’un registre d’actifs supportés (défini en genèse) avec leurs métadonnées.
-//! - Initiation d’une demande de transfert (spécifiant la direction : vers Nodara ou depuis Nodara).
-//! - Validation par plusieurs validateurs avant finalisation.
-//! - Finalisation du transfert qui appelle le gestionnaire d’actifs pour mint ou burn les tokens représentatifs.
-//!
-//! Ce module est conçu pour être déployé sur testnet et en production.
+//! Améliorations apportées dans cette version "extreme" :
+//! - Validation renforcée des entrées (vérification de la non-nullité de l'ID, du nom et du symbole).
+//! - Vérification que le montant du transfert est strictement positif.
+//! - Gestion avancée des confirmations avec vérification anti-doublon.
+//! - Documentation et commentaires détaillés pour chaque fonction.
+//! - Configuration de genèse complète pour pré‑charger une liste d’actifs supportés.
 
 use frame_support::{
     dispatch::DispatchResult, pallet_prelude::*, traits::{Currency, Get},
@@ -21,7 +20,7 @@ use frame_support::{
 use frame_system::pallet_prelude::*;
 use sp_std::collections::btree_set::BTreeSet;
 use sp_std::vec::Vec;
-use sp_std::prelude::*; // Ajouté pour inclure le trait ToString (et d'autres traits utiles)
+use sp_std::prelude::*; // Inclut notamment le trait ToString
 
 /// Trait pour gérer le minting et le burning des tokens représentatifs sur Nodara.
 pub trait BridgeAssetManager<AccountId> {
@@ -38,25 +37,36 @@ pub mod pallet {
     use super::*;
     use sp_runtime::traits::Zero;
 
-    pub type AssetId = Vec<u8>; // Par exemple : b"BTC", b"ETH", etc.
+    /// Type pour l'identifiant d'un actif (ex: b"BTC", b"ETH", etc.).
+    pub type AssetId = Vec<u8>;
+    /// Type pour l'identifiant d'un transfert.
     pub type TransferId = u64;
 
     /// Métadonnées d'un actif supporté par le bridge.
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, Default, TypeInfo)]
     pub struct AssetMetadata {
+        /// Nom complet de l'actif.
         pub name: Vec<u8>,
+        /// Symbole de l'actif.
         pub symbol: Vec<u8>,
+        /// Nombre de décimales.
         pub decimals: u8,
-        pub source_chain: Vec<u8>, // Exemple : b"BTC", b"ETH", b"ERC20", etc.
+        /// Chaîne source (ex: b"BTC", b"ETH", b"ERC20", etc.).
+        pub source_chain: Vec<u8>,
     }
 
     /// Structure représentant une demande de transfert inter‑chaînes.
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
     pub struct TransferRequest<AccountId> {
+        /// Identifiant unique du transfert.
         pub id: TransferId,
+        /// Compte à l'origine du transfert.
         pub from: AccountId,
+        /// Identifiant de l'actif concerné.
         pub asset: AssetId,
+        /// Montant à transférer.
         pub amount: u128,
+        /// Compte destinataire.
         pub destination: AccountId,
         /// Ensemble des validateurs ayant confirmé le transfert.
         pub confirmations: BTreeSet<AccountId>,
@@ -121,15 +131,25 @@ pub mod pallet {
         InsufficientConfirmations,
         /// Le validateur a déjà confirmé ce transfert.
         AlreadyConfirmed,
+        /// L’ID d’actif ou les métadonnées sont invalides.
+        InvalidAssetDefinition,
+        /// Le montant doit être supérieur à zéro.
+        InvalidAmount,
     }
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         /// Enregistre un actif dans le bridge.
+        ///
+        /// Vérifie que l'ID de l'actif, le nom et le symbole ne sont pas vides.
         #[pallet::weight(10_000)]
         pub fn register_asset(origin: OriginFor<T>, asset: AssetId, metadata: AssetMetadata) -> DispatchResult {
             let _ = ensure_signed(origin)?;
-            // Vous pouvez ajouter ici des vérifications supplémentaires, par exemple sur la taille ou la validité des métadonnées.
+            ensure!(!asset.is_empty(), Error::<T>::InvalidAssetDefinition);
+            ensure!(!metadata.name.is_empty(), Error::<T>::InvalidAssetDefinition);
+            ensure!(!metadata.symbol.is_empty(), Error::<T>::InvalidAssetDefinition);
+            // Insertion sans doublon (on suppose qu'un asset est unique).
+            ensure!(!SupportedAssets::<T>::contains_key(&asset), Error::<T>::AssetAlreadyExists);
             SupportedAssets::<T>::insert(&asset, metadata);
             Self::deposit_event(Event::AssetRegistered(asset));
             Ok(())
@@ -149,6 +169,7 @@ pub mod pallet {
             to_nodara: bool,
         ) -> DispatchResult {
             let sender = ensure_signed(origin)?;
+            ensure!(amount > 0, Error::<T>::InvalidAmount);
             ensure!(SupportedAssets::<T>::contains_key(&asset), Error::<T>::AssetNotSupported);
 
             let transfer_id = NextTransferId::<T>::get();
@@ -176,7 +197,7 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Un validateur confirme un transfert.
+        /// Permet à un validateur de confirmer un transfert.
         #[pallet::weight(10_000)]
         pub fn confirm_transfer(origin: OriginFor<T>, transfer_id: TransferId) -> DispatchResult {
             let validator = ensure_signed(origin)?;
@@ -192,7 +213,7 @@ pub mod pallet {
         /// Finalise le transfert une fois que le seuil de confirmations est atteint.
         ///
         /// Pour un transfert vers Nodara, mint les tokens représentatifs sur le compte destination.
-        /// Pour un transfert inverse, burn les tokens représentatifs depuis le compte source.
+        /// Pour un transfert inverse, burn les tokens représentatifs sur le compte source.
         #[pallet::weight(10_000)]
         #[transactional]
         pub fn finalize_transfer(origin: OriginFor<T>, transfer_id: TransferId) -> DispatchResult {
@@ -320,11 +341,11 @@ pub mod pallet {
         // Pour simplifier les tests, nous créons un gestionnaire d'actifs fictif.
         pub struct DummyAssetManager;
         impl BridgeAssetManager<u64> for DummyAssetManager {
-            fn mint(asset: Vec<u8>, to: &u64, amount: u128) -> DispatchResult {
+            fn mint(asset: Vec<u8>, _to: &u64, _amount: u128) -> DispatchResult {
                 // Simulez ici le minting (pour le test, on ne fait rien)
                 Ok(())
             }
-            fn burn(asset: Vec<u8>, from: &u64, amount: u128) -> DispatchResult {
+            fn burn(asset: Vec<u8>, _from: &u64, _amount: u128) -> DispatchResult {
                 // Simulez ici le burning (pour le test, on ne fait rien)
                 Ok(())
             }
