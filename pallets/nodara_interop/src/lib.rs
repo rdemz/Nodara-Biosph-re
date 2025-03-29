@@ -6,8 +6,8 @@
 //! This module implements secure cross-chain interoperability for the Nodara network.
 //! It handles sending, receiving and verifying messages between the Nodara blockchain and external chains.
 //! The module uses production-grade cryptographic verification (here simplifiée pour l'exemple)
-//! et maintient un historique immuable des événements interop pour garantir une traçabilité complète.
-//! Les versions des dépendances sont verrouillées pour garantir la reproductibilité du build.
+//! and maintains an immutable history of interop events to guarantee complete traceability.
+//! Dependency versions are locked to ensure reproducible builds.
 //!
 //! ## Fonctionnalités principales:
 //! - **Messagerie inter-chaînes:** Envoi et réception de messages sécurisés.
@@ -56,18 +56,21 @@ pub mod pallet {
     /// Stockage des messages sortants.
     #[pallet::storage]
     #[pallet::getter(fn outgoing_messages)]
-    pub type OutgoingMessages<T: Config> = StorageMap<_, Blake2_128Concat, u64, InteropMessage, OptionQuery>;
+    pub type OutgoingMessages<T: Config> =
+        StorageMap<_, Blake2_128Concat, u64, InteropMessage, OptionQuery>;
 
     /// Stockage des messages entrants.
     #[pallet::storage]
     #[pallet::getter(fn incoming_messages)]
-    pub type IncomingMessages<T: Config> = StorageMap<_, Blake2_128Concat, u64, InteropMessage, OptionQuery>;
+    pub type IncomingMessages<T: Config> =
+        StorageMap<_, Blake2_128Concat, u64, InteropMessage, OptionQuery>;
 
     /// Journalisation des événements interop.
     /// Chaque entrée est un tuple : (timestamp, message id, type d'opération, détails)
     #[pallet::storage]
     #[pallet::getter(fn interop_history)]
-    pub type InteropHistory<T: Config> = StorageValue<_, Vec<(u64, u64, Vec<u8>, Vec<u8>)>, ValueQuery>;
+    pub type InteropHistory<T: Config> =
+        StorageValue<_, Vec<(u64, u64, Vec<u8>, Vec<u8>)>, ValueQuery>;
 
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -194,6 +197,133 @@ pub mod pallet {
         /// Retourne un horodatage fixe (à remplacer par une source de temps fiable en production).
         fn current_timestamp() -> u64 {
             1_640_000_000
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use frame_support::{assert_err, assert_ok, parameter_types};
+        use sp_core::H256;
+        use sp_runtime::{
+            traits::{BlakeTwo256, IdentityLookup},
+            testing::Header,
+        };
+        use frame_system as system;
+
+        type UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
+        type Block = system::mocking::MockBlock<Test>;
+
+        frame_support::construct_runtime!(
+            pub enum Test where
+                Block = Block,
+                NodeBlock = Block,
+                UncheckedExtrinsic = UncheckedExtrinsic,
+            {
+                System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+                InteropModule: Pallet,
+            }
+        );
+
+        parameter_types! {
+            pub const BlockHashCount: u64 = 250;
+            pub const BaseTimeout: u64 = 300;
+            pub const MaxPayloadLength: u32 = 1024;
+        }
+
+        impl system::Config for Test {
+            type BaseCallFilter = frame_support::traits::Everything;
+            type BlockWeights = ();
+            type BlockLength = ();
+            type DbWeight = ();
+            type RuntimeOrigin = system::mocking::Origin;
+            type RuntimeCall = Call;
+            type Index = u64;
+            type BlockNumber = u64;
+            type Hash = H256;
+            type Hashing = BlakeTwo256;
+            type AccountId = u64;
+            type Lookup = IdentityLookup<Self::AccountId>;
+            type Header = Header;
+            type RuntimeEvent = ();
+            type BlockHashCount = BlockHashCount;
+            type Version = ();
+            type PalletInfo = ();
+            type AccountData = ();
+            type OnNewAccount = ();
+            type OnKilledAccount = ();
+            type SystemWeightInfo = ();
+            type SS58Prefix = ();
+            type OnSetCode = ();
+            type MaxConsumers = ();
+        }
+
+        impl Config for Test {
+            type RuntimeEvent = ();
+            type BaseTimeout = BaseTimeout;
+            type MaxPayloadLength = MaxPayloadLength;
+        }
+
+        #[test]
+        fn send_message_should_work() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let id = 1;
+            let payload = b"Test payload".to_vec();
+            let signature = b"Signature".to_vec();
+            assert_ok!(InteropModule::send_message(origin, id, payload.clone(), signature));
+            // Vérification: le message doit être enregistré dans les messages sortants.
+            let msg = InteropModule::outgoing_messages(id).expect("Message must be stored");
+            assert_eq!(msg.payload, payload);
+        }
+
+        #[test]
+        fn send_message_should_fail_if_payload_too_long() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let id = 2;
+            let payload = vec![0u8; (MaxPayloadLength::get() + 1) as usize];
+            let signature = b"Signature".to_vec();
+            assert_err!(
+                InteropModule::send_message(origin, id, payload, signature),
+                Error::<Test>::PayloadTooLong
+            );
+        }
+
+        #[test]
+        fn receive_message_should_work() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let id = 3;
+            let payload = b"Test payload receive".to_vec();
+            let signature = b"ValidSignature".to_vec();
+            assert_ok!(InteropModule::receive_message(origin, id, payload.clone(), signature));
+            // Vérification: le message doit être enregistré dans les messages entrants.
+            let msg = InteropModule::incoming_messages(id).expect("Message must be stored");
+            assert_eq!(msg.payload, payload);
+        }
+
+        #[test]
+        fn receive_message_should_fail_if_verification_fails() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let id = 4;
+            let payload = b"".to_vec();
+            let signature = b"".to_vec();
+            assert_err!(
+                InteropModule::receive_message(origin, id, payload, signature),
+                Error::<Test>::VerificationFailed
+            );
+        }
+
+        #[test]
+        fn update_config_should_work() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let new_config = b"NewConfig".to_vec();
+            let details = b"Update details".to_vec();
+            assert_ok!(InteropModule::update_config(origin, new_config.clone(), details.clone()));
+            // Vérification: l'historique doit contenir l'entrée de mise à jour de configuration.
+            let history = InteropModule::interop_history();
+            let config_updates: Vec<_> = history.into_iter().filter(|(_, id, op, _)| {
+                *id == 0 && op == b"ConfigUpdate".to_vec()
+            }).collect();
+            assert!(!config_updates.is_empty());
         }
     }
 }
