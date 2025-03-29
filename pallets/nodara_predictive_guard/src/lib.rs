@@ -56,7 +56,7 @@ pub mod pallet {
         type MinPredictiveValue: Get<u32>;
     }
 
-    /// Stockage du paramètre prédictif courant.
+    /// Storage du paramètre prédictif courant.
     #[pallet::storage]
     #[pallet::getter(fn predictive_value)]
     pub type PredictiveValue<T: Config> = StorageValue<_, u32, ValueQuery>;
@@ -66,10 +66,13 @@ pub mod pallet {
     #[pallet::getter(fn predictive_history)]
     pub type PredictiveHistory<T: Config> = StorageValue<_, Vec<PredictiveLog>, ValueQuery>;
 
+    #[pallet::pallet]
+    pub struct Pallet<T>(_);
+
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        /// Emis lors d'un ajustement prédictif: (précédent, nouveau, signal économique).
+        /// Emis lors d'un ajustement prédictif: (ancien, nouveau, signal économique).
         PredictiveAdjusted(u32, u32, u32),
     }
 
@@ -81,15 +84,12 @@ pub mod pallet {
         InvalidEconomicSignal,
     }
 
-    #[pallet::pallet]
-    pub struct Pallet<T>(_);
-
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         /// Initialise le paramètre prédictif avec la valeur de base.
         #[pallet::weight(10_000)]
         pub fn initialize_predictive(origin: OriginFor<T>) -> DispatchResult {
-            // Pour cet exemple, nous acceptons un appel signé.
+            // On accepte un appel signé (pour cet exemple).
             let _ = ensure_signed(origin)?;
             let baseline = T::BaselinePredictiveValue::get();
             <PredictiveValue<T>>::put(baseline);
@@ -107,7 +107,6 @@ pub mod pallet {
 
         /// Met à jour le paramètre prédictif en fonction d'un signal économique.
         ///
-        /// # Paramètres
         /// - `economic_signal`: Un indicateur économique utilisé pour ajuster la valeur prédictive.
         #[pallet::weight(10_000)]
         pub fn update_predictive(origin: OriginFor<T>, economic_signal: u32) -> DispatchResult {
@@ -115,7 +114,7 @@ pub mod pallet {
             ensure!(economic_signal > 0, Error::<T>::InvalidEconomicSignal);
 
             let current = <PredictiveValue<T>>::get();
-            // Exemple de formule d'ajustement avec un facteur de lissage fixe (ici 10).
+            // Calcul simple de l'ajustement avec un facteur de 10.
             let adjustment = economic_signal / 10;
             let new_value = current.saturating_add(adjustment);
 
@@ -161,7 +160,7 @@ pub mod pallet {
         type Block = system::mocking::MockBlock<Test>;
 
         frame_support::construct_runtime!(
-            pub enum Test where
+            pub enum Test where 
                 Block = Block,
                 NodeBlock = Block,
                 UncheckedExtrinsic = UncheckedExtrinsic,
@@ -229,10 +228,8 @@ pub mod pallet {
         #[test]
         fn update_predictive_should_work() {
             let origin = system::RawOrigin::Signed(1).into();
-            // Initialize first.
             assert_ok!(PredictiveGuardModule::initialize_predictive(origin.clone()));
             let baseline = PredictiveGuardModule::predictive_value();
-            // Use a valid economic signal.
             let economic_signal = 50; // adjustment = 50 / 10 = 5
             assert_ok!(PredictiveGuardModule::update_predictive(origin, economic_signal));
             let new_value = PredictiveGuardModule::predictive_value();
@@ -249,7 +246,6 @@ pub mod pallet {
         fn update_predictive_should_fail_on_invalid_signal() {
             let origin = system::RawOrigin::Signed(1).into();
             assert_ok!(PredictiveGuardModule::initialize_predictive(origin.clone()));
-            // Signal zero should be invalid.
             assert_err!(
                 PredictiveGuardModule::update_predictive(origin, 0),
                 Error::<Test>::InvalidEconomicSignal
@@ -260,7 +256,6 @@ pub mod pallet {
         fn update_predictive_should_fail_if_out_of_bounds() {
             let origin = system::RawOrigin::Signed(1).into();
             assert_ok!(PredictiveGuardModule::initialize_predictive(origin.clone()));
-            // Set a very high economic signal that pushes new_value over MaxPredictiveValue.
             let current = PredictiveGuardModule::predictive_value();
             let excessive_signal = (MaxPredictiveValue::get() - current + 1) * 10;
             assert_err!(
