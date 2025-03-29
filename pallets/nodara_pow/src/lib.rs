@@ -7,10 +7,11 @@
 //! It securely validates work submissions from miners, dynamically adjusts mining difficulty based on network conditions,
 //! and logs all operations for full auditability.
 
-use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
+use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Get};
 use frame_system::pallet_prelude::*;
 use sp_std::vec::Vec;
-use sp_runtime::RuntimeDebug;
+use sp_runtime::{RuntimeDebug, traits::SaturatedConversion};
+use parity_scale_codec::{Encode, Decode};
 
 /// Structure representing the PoW state.
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, Default)]
@@ -27,6 +28,7 @@ pub mod pallet {
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
+    /// Configuration du module.
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// Runtime event type.
@@ -39,6 +41,7 @@ pub mod pallet {
         type PowSmoothingFactor: Get<u32>;
     }
 
+    /// Stockage de l'état de PoW.
     #[pallet::storage]
     #[pallet::getter(fn pow_state)]
     pub type PowStateStorage<T: Config> = StorageValue<_, PowState, ValueQuery>;
@@ -60,9 +63,15 @@ pub mod pallet {
         InvalidWork,
     }
 
+    /// Dispatchable functions for the module.
+    #[pallet::call]
     impl<T: Config> Pallet<T> {
         /// Initializes the PoW state with a baseline difficulty.
-        pub fn initialize_pow() -> DispatchResult {
+        ///
+        /// Can only be called by Root.
+        #[pallet::weight(10_000)]
+        pub fn initialize_pow(origin: OriginFor<T>) -> DispatchResult {
+            ensure_root(origin)?;
             let now = <frame_system::Pallet<T>>::block_number().saturated_into::<u64>();
             let baseline = T::BaselineDifficulty::get();
             let state = PowState {
@@ -78,16 +87,21 @@ pub mod pallet {
         ///
         /// For demonstration purposes, the work submission is simplified.
         /// In a real implementation, work would involve solving a cryptographic puzzle.
-        pub fn submit_work(origin: T::Origin, work_value: u32, signature: Vec<u8>) -> DispatchResult {
+        #[pallet::weight(10_000)]
+        pub fn submit_work(
+            origin: OriginFor<T>,
+            work_value: u32,
+            signature: Vec<u8>,
+        ) -> DispatchResult {
             let miner = ensure_signed(origin)?;
             ensure!(work_value > 0, Error::<T>::InvalidWork);
-            // Simulate work verification using the signature (placeholder logic).
+            // Simulated work verification using the signature.
             ensure!(!signature.is_empty(), Error::<T>::InvalidWork);
             let state = <PowStateStorage<T>>::get();
-            // For simplicity, assume work is valid if work_value is above a threshold defined by difficulty.
+            // Work is accepted if work_value meets the current difficulty.
             ensure!(work_value >= state.difficulty, Error::<T>::WorkRejected);
 
-            // Update total work
+            // Update total work.
             <PowStateStorage<T>>::mutate(|s| {
                 s.total_work = s.total_work.saturating_add(work_value);
             });
@@ -100,7 +114,13 @@ pub mod pallet {
         ///
         /// The new difficulty is calculated as:
         ///   new_difficulty = current_difficulty + (signal / PowSmoothingFactor)
-        pub fn adjust_difficulty(signal: u32) -> DispatchResult {
+        #[pallet::weight(10_000)]
+        pub fn adjust_difficulty(
+            origin: OriginFor<T>,
+            signal: u32,
+        ) -> DispatchResult {
+            // Requirement: only a signed call can trigger an adjustment.
+            ensure_signed(origin)?;
             ensure!(signal > 0, Error::<T>::InvalidWork);
             <PowStateStorage<T>>::mutate(|s| {
                 let previous = s.difficulty;
@@ -111,7 +131,9 @@ pub mod pallet {
                 s.difficulty = new_difficulty;
             });
             let state = <PowStateStorage<T>>::get();
-            Self::deposit_event(Event::DifficultyAdjusted(state.history.last().unwrap().1, state.difficulty, signal));
+            // Retrieve previous difficulty from the last history record.
+            let last_record = state.history.last().unwrap();
+            Self::deposit_event(Event::DifficultyAdjusted(last_record.1, state.difficulty, signal));
             Ok(())
         }
     }
