@@ -89,6 +89,7 @@ pub mod pallet {
         /// Initialise le paramètre prédictif avec la valeur de base.
         #[pallet::weight(10_000)]
         pub fn initialize_predictive(origin: OriginFor<T>) -> DispatchResult {
+            // Pour cet exemple, nous acceptons un appel signé.
             let _ = ensure_signed(origin)?;
             let baseline = T::BaselinePredictiveValue::get();
             <PredictiveValue<T>>::put(baseline);
@@ -114,7 +115,7 @@ pub mod pallet {
             ensure!(economic_signal > 0, Error::<T>::InvalidEconomicSignal);
 
             let current = <PredictiveValue<T>>::get();
-            // Exemple de formule d'ajustement avec un facteur de lissage (ici fixé à 10)
+            // Exemple de formule d'ajustement avec un facteur de lissage fixe (ici 10).
             let adjustment = economic_signal / 10;
             let new_value = current.saturating_add(adjustment);
 
@@ -142,6 +143,130 @@ pub mod pallet {
         /// Retourne un timestamp fixe (à remplacer par un fournisseur de temps fiable en production).
         fn current_timestamp() -> u64 {
             1_640_000_000
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use frame_support::{assert_ok, assert_err, parameter_types};
+        use sp_core::H256;
+        use sp_runtime::{
+            traits::{BlakeTwo256, IdentityLookup},
+            testing::Header,
+        };
+        use frame_system as system;
+
+        type UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
+        type Block = system::mocking::MockBlock<Test>;
+
+        frame_support::construct_runtime!(
+            pub enum Test where
+                Block = Block,
+                NodeBlock = Block,
+                UncheckedExtrinsic = UncheckedExtrinsic,
+            {
+                System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+                PredictiveGuardModule: Pallet,
+            }
+        );
+
+        parameter_types! {
+            pub const BlockHashCount: u64 = 250;
+            pub const BaselinePredictiveValue: u32 = 100;
+            pub const MaxPredictiveValue: u32 = 1000;
+            pub const MinPredictiveValue: u32 = 10;
+        }
+
+        impl system::Config for Test {
+            type BaseCallFilter = frame_support::traits::Everything;
+            type BlockWeights = ();
+            type BlockLength = ();
+            type DbWeight = ();
+            type RuntimeOrigin = system::mocking::Origin;
+            type RuntimeCall = Call;
+            type Index = u64;
+            type BlockNumber = u64;
+            type Hash = H256;
+            type Hashing = BlakeTwo256;
+            type AccountId = u64;
+            type Lookup = IdentityLookup<Self::AccountId>;
+            type Header = Header;
+            type RuntimeEvent = ();
+            type BlockHashCount = BlockHashCount;
+            type Version = ();
+            type PalletInfo = ();
+            type AccountData = ();
+            type OnNewAccount = ();
+            type OnKilledAccount = ();
+            type SystemWeightInfo = ();
+            type SS58Prefix = ();
+            type OnSetCode = ();
+            type MaxConsumers = ();
+        }
+
+        impl Config for Test {
+            type RuntimeEvent = ();
+            type BaselinePredictiveValue = BaselinePredictiveValue;
+            type MaxPredictiveValue = MaxPredictiveValue;
+            type MinPredictiveValue = MinPredictiveValue;
+        }
+
+        #[test]
+        fn initialize_predictive_should_work() {
+            let origin = system::RawOrigin::Signed(1).into();
+            assert_ok!(PredictiveGuardModule::initialize_predictive(origin));
+            let value = PredictiveGuardModule::predictive_value();
+            assert_eq!(value, BaselinePredictiveValue::get());
+            let history = PredictiveGuardModule::predictive_history();
+            assert_eq!(history.len(), 1);
+            let log = &history[0];
+            assert_eq!(log.previous_value, 0);
+            assert_eq!(log.new_value, BaselinePredictiveValue::get());
+            assert_eq!(log.economic_signal, 0);
+        }
+
+        #[test]
+        fn update_predictive_should_work() {
+            let origin = system::RawOrigin::Signed(1).into();
+            // Initialize first.
+            assert_ok!(PredictiveGuardModule::initialize_predictive(origin.clone()));
+            let baseline = PredictiveGuardModule::predictive_value();
+            // Use a valid economic signal.
+            let economic_signal = 50; // adjustment = 50 / 10 = 5
+            assert_ok!(PredictiveGuardModule::update_predictive(origin, economic_signal));
+            let new_value = PredictiveGuardModule::predictive_value();
+            assert_eq!(new_value, baseline.saturating_add(5));
+            let history = PredictiveGuardModule::predictive_history();
+            assert_eq!(history.len(), 2);
+            let last_log = history.last().unwrap();
+            assert_eq!(last_log.previous_value, baseline);
+            assert_eq!(last_log.new_value, new_value);
+            assert_eq!(last_log.economic_signal, economic_signal);
+        }
+
+        #[test]
+        fn update_predictive_should_fail_on_invalid_signal() {
+            let origin = system::RawOrigin::Signed(1).into();
+            assert_ok!(PredictiveGuardModule::initialize_predictive(origin.clone()));
+            // Signal zero should be invalid.
+            assert_err!(
+                PredictiveGuardModule::update_predictive(origin, 0),
+                Error::<Test>::InvalidEconomicSignal
+            );
+        }
+
+        #[test]
+        fn update_predictive_should_fail_if_out_of_bounds() {
+            let origin = system::RawOrigin::Signed(1).into();
+            assert_ok!(PredictiveGuardModule::initialize_predictive(origin.clone()));
+            // Set a very high economic signal that pushes new_value over MaxPredictiveValue.
+            let current = PredictiveGuardModule::predictive_value();
+            let excessive_signal = (MaxPredictiveValue::get() - current + 1) * 10;
+            assert_err!(
+                PredictiveGuardModule::update_predictive(origin, excessive_signal),
+                Error::<Test>::PredictiveValueOutOfBounds
+            );
         }
     }
 }
