@@ -21,6 +21,7 @@ use frame_support::{
 use frame_system::pallet_prelude::*;
 use sp_std::collections::btree_set::BTreeSet;
 use sp_std::vec::Vec;
+use sp_std::prelude::*; // Ajouté pour inclure le trait ToString (et d'autres traits utiles)
 
 /// Trait pour gérer le minting et le burning des tokens représentatifs sur Nodara.
 pub trait BridgeAssetManager<AccountId> {
