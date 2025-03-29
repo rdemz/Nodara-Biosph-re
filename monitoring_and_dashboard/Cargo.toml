@@ -3,11 +3,18 @@ name = "monitoring_and_dashboard"
 version = "1.0.0"
 edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
+description = "Monitoring and dashboard module for Nodara BIOSPHÈRE QUANTIC."
 license = "MIT"
-description = "Monitoring and dashboard module for Nodara BIOSPHÈRE."
 repository = "https://github.com/rdemz/Nodara-Biosph-re"
 readme = "README.md"
 
 [[bin]]
 name = "monitoring_and_dashboard"
 path = "src/main.rs"
+
+[dependencies]
+hyper = "0.14"
+prometheus = "0.14"
+lazy_static = "1.4"
+env_logger = "0.10"
+tokio = { version = "1", features = ["full"] }
