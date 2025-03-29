@@ -12,7 +12,6 @@
 //! - **Audit Logging:** Maintains an immutable log of every reward distribution event.
 //! - **DAO Governance Integration:** Allows future proposals to adjust reward parameters.
 //! - **Performance Optimizations:** Optimized arithmetic and memory handling.
-//!
 
 use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Get};
 use frame_system::pallet_prelude::*;
@@ -135,8 +134,125 @@ pub mod pallet {
                 state.reward_pool = state.reward_pool.saturating_sub(amount);
             }
             <RewardEngineStorage<T>>::put(state);
-            Self::deposit_event(Event::RewardPoolUpdated(previous_pool, state.reward_pool));
+            Self::deposit_event(Event::RewardPoolUpdated(previous_pool, <RewardEngineStorage<T>>::get().reward_pool));
             Ok(())
+        }
+    }
+    
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use frame_support::{assert_ok, assert_err, parameter_types};
+        use sp_core::H256;
+        use sp_runtime::{
+            traits::{BlakeTwo256, IdentityLookup},
+            testing::Header,
+        };
+        use frame_system as system;
+
+        type UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
+        type Block = system::mocking::MockBlock<Test>;
+
+        frame_support::construct_runtime!(
+            pub enum Test where
+                Block = Block,
+                NodeBlock = Block,
+                UncheckedExtrinsic = UncheckedExtrinsic,
+            {
+                System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+                RewardEngineModule: Pallet,
+            }
+        );
+
+        parameter_types! {
+            pub const BlockHashCount: u64 = 250;
+            pub const BaselineRewardPool: u128 = 1_000_000;
+        }
+
+        impl system::Config for Test {
+            type BaseCallFilter = frame_support::traits::Everything;
+            type BlockWeights = ();
+            type BlockLength = ();
+            type DbWeight = ();
+            type RuntimeOrigin = system::mocking::Origin;
+            type RuntimeCall = Call;
+            type Index = u64;
+            type BlockNumber = u64;
+            type Hash = H256;
+            type Hashing = BlakeTwo256;
+            type AccountId = u64;
+            type Lookup = IdentityLookup<Self::AccountId>;
+            type Header = Header;
+            type RuntimeEvent = ();
+            type BlockHashCount = BlockHashCount;
+            type Version = ();
+            type PalletInfo = ();
+            type AccountData = ();
+            type OnNewAccount = ();
+            type OnKilledAccount = ();
+            type SystemWeightInfo = ();
+            type SS58Prefix = ();
+            type OnSetCode = ();
+            type MaxConsumers = ();
+        }
+
+        impl Config for Test {
+            type RuntimeEvent = ();
+            type BaselineRewardPool = BaselineRewardPool;
+        }
+
+        #[test]
+        fn initialize_rewards_works() {
+            assert_ok!(RewardEngineModule::initialize_rewards(system::RawOrigin::Root.into()));
+            let state = RewardEngineModule::reward_engine_state();
+            assert_eq!(state.reward_pool, BaselineRewardPool::get());
+            assert!(state.history.is_empty());
+        }
+
+        #[test]
+        fn distribute_reward_works() {
+            let account = 1;
+            // Initialize the reward engine.
+            assert_ok!(RewardEngineModule::initialize_rewards(system::RawOrigin::Root.into()));
+            // Distribute a reward.
+            let reward = 100_000;
+            let details = b"Test reward".to_vec();
+            assert_ok!(RewardEngineModule::distribute_reward(system::RawOrigin::Signed(2).into(), account, reward, details.clone()));
+            let state = RewardEngineModule::reward_engine_state();
+            assert_eq!(state.reward_pool, BaselineRewardPool::get() - reward);
+            // Verify that history contains a record.
+            assert!(!state.history.is_empty());
+        }
+
+        #[test]
+        fn distribute_reward_fails_if_insufficient_pool() {
+            let account = 1;
+            // Initialize with a low reward pool.
+            let low_pool = 50;
+            assert_ok!(RewardEngineModule::update_reward_pool(system::RawOrigin::Signed(2).into(), BaselineRewardPool::get() - low_pool, false));
+            // Try to distribute a reward greater than the pool.
+            let reward = 100;
+            assert_err!(
+                RewardEngineModule::distribute_reward(system::RawOrigin::Signed(2).into(), account, reward, b"Test".to_vec()),
+                Error::<Test>::InsufficientRewardPool
+            );
+        }
+
+        #[test]
+        fn update_reward_pool_works() {
+            // Initialize the reward engine.
+            assert_ok!(RewardEngineModule::initialize_rewards(system::RawOrigin::Root.into()));
+            let current_pool = RewardEngineModule::reward_engine_state().reward_pool;
+            // Increase pool.
+            let increase_amount = 200_000;
+            assert_ok!(RewardEngineModule::update_reward_pool(system::RawOrigin::Signed(2).into(), increase_amount, true));
+            let new_pool = RewardEngineModule::reward_engine_state().reward_pool;
+            assert_eq!(new_pool, current_pool + increase_amount);
+            // Decrease pool.
+            let decrease_amount = 100_000;
+            assert_ok!(RewardEngineModule::update_reward_pool(system::RawOrigin::Signed(2).into(), decrease_amount, false));
+            let final_pool = RewardEngineModule::reward_engine_state().reward_pool;
+            assert_eq!(final_pool, current_pool + increase_amount - decrease_amount);
         }
     }
 }
