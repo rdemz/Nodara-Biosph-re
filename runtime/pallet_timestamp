@@ -1,0 +1,184 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+#![recursion_limit = "1024"]
+
+//! # pallet_timestamp
+//!
+//! Ce pallet fournit un horodatage pour le runtime. Il définit un type Moment (ici un u64)
+//! et expose une fonction inherent pour initialiser l'heure dans chaque bloc.
+//!
+//! En production, ce pallet est essentiel pour fournir des timestamps fiables.
+
+use frame_support::{pallet_prelude::*, traits::Get};
+use frame_system::pallet_prelude::*;
+use sp_std::vec::Vec;
+use sp_runtime::traits::SaturatedConversion;
+use parity_scale_codec::{Encode, Decode};
+use scale_info::TypeInfo;
+
+#[frame_support::pallet]
+pub mod pallet {
+    use super::*;
+
+    #[pallet::pallet]
+    #[pallet::generate_store(pub(super) trait Store)]
+    pub struct Pallet<T>(_);
+
+    /// Configuration du pallet_timestamp.
+    #[pallet::config]
+    pub trait Config: frame_system::Config {
+        /// Le type représentant le moment (timestamp). Ici, nous utilisons u64.
+        type Moment: Parameter + Default + Copy + Into<u64>;
+        /// La période minimale entre deux blocs (en millisecondes).
+        #[pallet::constant]
+        type MinimumPeriod: Get<Self::Moment>;
+        /// WeightInfo (placeholder).
+        type WeightInfo: WeightInfo;
+    }
+
+    /// Trait de poids pour ce pallet.
+    pub trait WeightInfo {
+        fn set() -> Weight;
+    }
+
+    #[cfg(feature = "std")]
+    impl WeightInfo for () {
+        fn set() -> Weight {
+            0
+        }
+    }
+
+    /// Storage pour le moment actuel.
+    #[pallet::storage]
+    #[pallet::getter(fn now)]
+    pub type Now<T: Config> = StorageValue<_, T::Moment, ValueQuery>;
+
+    #[pallet::event]
+    #[pallet::generate_deposit(pub(super) fn deposit_event)]
+    pub enum Event<T: Config> {
+        /// Timestamp updated: (new moment)
+        TimestampSet(T::Moment),
+    }
+
+    #[pallet::error]
+    pub enum Error<T> {
+        /// The timestamp provided is not greater than the previous one.
+        TimestampNotIncreasing,
+    }
+
+    #[pallet::inherent]
+    impl<T: Config> InherentDataProviders for Pallet<T> {
+        fn create_inherent_data() -> Result<InherentData, sp_runtime::transaction_validity::InvalidTransaction> {
+            // Pour cet exemple, nous utilisons un timestamp fixe.
+            // En production, vous intégrerez une source de temps externe.
+            let timestamp = T::Moment::default();
+            let mut data = InherentData::new();
+            data.put_data(T::block_timestamp_inherent_identifier(), timestamp.encode());
+            Ok(data)
+        }
+
+        fn check_inherent_data(data: &InherentData) -> Result<(), sp_runtime::transaction_validity::InvalidTransaction> {
+            if data.get_data(T::block_timestamp_inherent_identifier()).is_some() {
+                Ok(())
+            } else {
+                Err(sp_runtime::transaction_validity::InvalidTransaction::Custom(1))
+            }
+        }
+    }
+
+    impl<T: Config> Pallet<T> {
+        /// Mise à jour du timestamp.
+        pub fn set_timestamp(now: T::Moment) -> DispatchResult {
+            // Optionnel : On peut ajouter des vérifications, par exemple que now > previous timestamp.
+            let previous = Self::now();
+            // Pour cet exemple, on accepte tout.
+            <Now<T>>::put(now);
+            Self::deposit_event(Event::TimestampSet(now));
+            Ok(())
+        }
+    }
+
+    // Helper to get inherent identifier for timestamp.
+    impl<T: Config> T {
+        pub fn block_timestamp_inherent_identifier() -> [u8; 4] {
+            *b"tmst"
+        }
+    }
+
+    #[pallet::call]
+    impl<T: Config> Pallet<T> {
+        /// Extrinsic pour définir le timestamp (utile pour les tests).
+        #[pallet::weight(T::WeightInfo::set())]
+        pub fn set_timestamp_call(origin: OriginFor<T>, now: T::Moment) -> DispatchResult {
+            ensure_root(origin)?;
+            Self::set_timestamp(now)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use frame_support::{assert_ok, parameter_types};
+        use sp_core::H256;
+        use sp_runtime::{testing::Header, traits::IdentityLookup};
+
+        type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+        type Block = frame_system::mocking::MockBlock<Test>;
+
+        frame_support::construct_runtime!(
+            pub enum Test where
+                Block = Block,
+                NodeBlock = Block,
+                UncheckedExtrinsic = UncheckedExtrinsic,
+            {
+                System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+                TimestampModule: Pallet,
+            }
+        );
+
+        parameter_types! {
+            pub const BlockHashCount: u64 = 250;
+            pub const MinimumPeriod: u64 = 500; // 500ms
+        }
+
+        impl frame_system::Config for Test {
+            type BaseCallFilter = frame_support::traits::Everything;
+            type BlockWeights = ();
+            type BlockLength = ();
+            type DbWeight = ();
+            type RuntimeOrigin = system::mocking::Origin;
+            type RuntimeCall = Call;
+            type Index = u64;
+            type BlockNumber = u64;
+            type Hash = H256;
+            type Hashing = sp_runtime::traits::BlakeTwo256;
+            type AccountId = u64;
+            type Lookup = IdentityLookup<Self::AccountId>;
+            type Header = Header;
+            type RuntimeEvent = ();
+            type BlockHashCount = BlockHashCount;
+            type Version = ();
+            type PalletInfo = ();
+            type AccountData = ();
+            type OnNewAccount = ();
+            type OnKilledAccount = ();
+            type SystemWeightInfo = ();
+            type SS58Prefix = ();
+            type OnSetCode = ();
+            type MaxConsumers = ();
+        }
+
+        impl Config for Test {
+            type RuntimeEvent = ();
+            type Moment = u64;
+            type MinimumPeriod = MinimumPeriod;
+            type WeightInfo = ();
+        }
+
+        #[test]
+        fn test_set_timestamp() {
+            // Set timestamp via extrinsic.
+            assert_ok!(TimestampModule::set_timestamp_call(system::RawOrigin::Root.into(), 1_650_000_000));
+            assert_eq!(TimestampModule::now(), 1_650_000_000);
+        }
+    }
+}
