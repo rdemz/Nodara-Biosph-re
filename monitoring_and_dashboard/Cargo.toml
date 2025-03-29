@@ -1,20 +1,20 @@
 [package]
 name = "monitoring_and_dashboard"
-version = "1.0.0"
+version = "0.1.0"
+authors = ["Votre Nom <votre.email@example.com>"]
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
-description = "Monitoring and dashboard module for Nodara BIOSPHÈRE QUANTIC."
-license = "MIT"
-repository = "https://github.com/rdemz/Nodara-Biosph-re"
-readme = "README.md"
-
-[[bin]]
-name = "monitoring_and_dashboard"
-path = "src/main.rs"
+description = "Module de monitoring et dashboard pour Nodara BIOSPHÈRE QUANTIC"
+license = "Apache-2.0"
 
 [dependencies]
-hyper = { version = "0.14", features = ["server"] }
-prometheus = "0.14"
-lazy_static = "1.4"
-env_logger = "0.10"
+# Serveur HTTP asynchrone
+hyper = { version = "0.14", features = ["full"] }
+# Runtime asynchrone
 tokio = { version = "1", features = ["full"] }
+# Outils de métriques Prometheus
+prometheus = "0.13"
+# Création de variables statiques paresseuses
+lazy_static = "1.4"
+# Journalisation structurée
+tracing = "0.1"
+tracing-subscriber = "0.3"
