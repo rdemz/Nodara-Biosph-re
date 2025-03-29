@@ -6,13 +6,12 @@ edition = "2021"
 description = "Nodara Runtime - Assembly of the complete Nodara BIOSPHÈRE QUANTIC runtime."
 license = "MIT"
 repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
+readme = "README.md"
 
 [dependencies]
-sp-core = { version = "6.0.0", default-features = false }
-sp-runtime = { version = "6.0.0", default-features = false }
-frame-support = { version = "6.0.0", default-features = false }
-frame-system = { version = "6.0.0", default-features = false }
-log = "0.4"
-env_logger = "0.10"
-
-[dev-dependencies]
+sp-core       = { version = "30.0.0", default-features = false }
+sp-runtime    = { version = "30.0.0", default-features = false }
+frame-support = { version = "30.0.0", default-features = false }
+frame-system  = { version = "30.0.0", default-features = false }
+log           = "0.4"
+env_logger    = "0.10"
