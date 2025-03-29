@@ -1,0 +1,12 @@
+[package]
+name = "nodara_pow"
+version = "0.1.0"
+authors = ["Nodara Team <team@nodara.com>"]
+edition = "2021"
+license = "MIT"
+description = "Module de preuve de travail (POW) pour Nodara"
+repository = "https://github.com/rdemz/Nodara-Biosph-re"
+readme = "README.md"
+
+[dependencies]
+# Les dépendances partagées définies dans le workspace seront automatiquement disponibles.
