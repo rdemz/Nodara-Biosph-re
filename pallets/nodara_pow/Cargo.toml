@@ -9,4 +9,9 @@ repository = "https://github.com/rdemz/Nodara-Biosph-re"
 readme = "README.md"
 
 [dependencies]
-# Les dépendances partagées définies dans le workspace seront automatiquement disponibles.
+frame-support    = { version = "30.0.0", default-features = false }
+frame-system     = { version = "30.0.0", default-features = false }
+sp-runtime       = { version = "30.0.0", default-features = false }
+sp-std           = { version = "10.0.0", default-features = false }
+parity-scale-codec = { version = "3.6.1", default-features = false }
+scale-info       = "2.3.0"
