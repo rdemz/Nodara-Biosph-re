@@ -30,8 +30,6 @@ members = [
     "pallets/nodara_standards",
 
     # Outils
-    "agent",
-    "current_project/pallets/oracle",
     "risk_management"
 ]
 
