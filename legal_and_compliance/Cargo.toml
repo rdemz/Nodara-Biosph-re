@@ -2,32 +2,33 @@
 name = "legal_and_compliance"
 version = "0.1.0"
 edition = "2021"
-description = "Module providing smart regulatory compliance for the Nodara BIOSPHERE blockchain."
+description = "Module providing smart regulatory compliance for the Nodara BIOSPHÈRE blockchain."
 license = "Unlicense"
 homepage = "https://nodara.org"
 repository = "https://github.com/rdemz/Nodara-Biosph-re"
+readme = "README.md"
 
 [dependencies]
-frame-support = { version = "22.0.0", default-features = false }
-frame-system = { version = "22.0.0", default-features = false }
-sp-std = { version = "7.0.0", default-features = false }
-sp-runtime = { version = "24.0.0", default-features = false }
-sp-io = { version = "24.0.0", default-features = false }
-scale-info = { version = "2.11.1", default-features = false, features = ["derive"] }
-codec = { package = "parity-scale-codec", version = "3.6.1", default-features = false, features = ["derive"] }
+frame-support = { version = "30.0.0", default-features = false }
+frame-system  = { version = "30.0.0", default-features = false }
+sp-std        = { version = "10.0.0", default-features = false }
+sp-runtime    = { version = "30.0.0", default-features = false }
+sp-io         = { version = "30.0.0", default-features = false }
+scale-info    = { version = "2.3.0", default-features = false, features = ["derive"] }
+codec         = { package = "parity-scale-codec", version = "3.6.1", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
-frame-benchmarking = { version = "22.0.0", default-features = false }
+frame-benchmarking = { version = "30.0.0", default-features = false }
 
 [features]
 default = ["std"]
 std = [
-    "frame-support/std",
-    "frame-system/std",
-    "sp-std/std",
-    "sp-runtime/std",
-    "sp-io/std",
-    "scale-info/std",
-    "codec/std",
-    "frame-benchmarking/std",
+  "frame-support/std",
+  "frame-system/std",
+  "sp-std/std",
+  "sp-runtime/std",
+  "sp-io/std",
+  "scale-info/std",
+  "codec/std",
+  "frame-benchmarking/std",
 ]
