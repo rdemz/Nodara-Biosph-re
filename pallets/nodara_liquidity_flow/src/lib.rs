@@ -3,44 +3,46 @@
 
 //! # Nodara Liquidity Flow Module - Advanced Version
 //!
-//! This module manages liquidity flows within the Nodara network. It monitors real-time liquidity,
-//! adjusts parameters to redistribute funds dynamically, and maintains a full audit log of all liquidity
-//! adjustments. DAO governance integration allows for future updates of base parameters. The module is
-//! optimized for high-performance environments on testnet/mainnet.
-//!
-//! ## Advanced Features
-//! - **Real-Time Liquidity Monitoring:** Tracks liquidity levels continuously.
-//! - **Dynamic Adjustments:** Automatically adjusts liquidity based on measured metrics.
-//! - **Audit Logging:** Records each liquidity adjustment with a timestamp, previous level, new level, and adjustment metric.
-//! - **DAO Governance Integration:** Future-proof design for parameter updates via on-chain governance.
-//! - **Performance Optimizations:** Optimized arithmetic operations and integrated benchmarks.
+//! Ce module gère les flux de liquidité au sein du réseau Nodara. Il surveille en temps réel le niveau de liquidité,
+//! ajuste dynamiquement les paramètres pour redistribuer les fonds, et conserve un journal complet de toutes les opérations
+//! d'ajustement. Ce module intègre des optimisations pour les environnements à haute performance (testnet/mainnet).
 
-use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Get};
+use frame_support::{
+    dispatch::DispatchResult, pallet_prelude::*, traits::{Currency, Get},
+    transactional,
+};
 use frame_system::pallet_prelude::*;
 use sp_std::vec::Vec;
 use sp_runtime::RuntimeDebug;
 use parity_scale_codec::{Encode, Decode};
 use scale_info::TypeInfo;
 
-/// Structure representing a liquidity adjustment record.
+/// Structure représentant un enregistrement d'ajustement de liquidité.
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 pub struct LiquidityRecord {
+    /// Horodatage de l'opération.
     pub timestamp: u64,
+    /// Niveau de liquidité avant l'ajustement.
     pub previous_level: u32,
+    /// Niveau de liquidité après l'ajustement.
     pub new_level: u32,
+    /// Valeur de la métrique d'ajustement fournie.
     pub adjustment_metric: u32,
 }
 
-/// Global state for liquidity management.
+/// État global du module de liquidité.
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, Default, TypeInfo)]
 pub struct LiquidityState {
+    /// Niveau de liquidité actuel.
     pub current_level: u32,
+    /// Historique complet des ajustements.
     pub history: Vec<LiquidityRecord>,
 }
 
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
+    use sp_runtime::traits::Zero;
 
     #[pallet::pallet]
     #[pallet::generate_store(pub(super) trait Store)]
@@ -49,17 +51,22 @@ pub mod pallet {
     /// Configuration du module.
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// Type d'événement.
+        /// Type d'événement du runtime.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
         /// Niveau de liquidité de base pour l'initialisation.
         #[pallet::constant]
         type BaselineLiquidity: Get<u32>;
-        /// Facteur de lissage pour les ajustements.
+        /// Facteur de lissage pour le calcul de l'ajustement.
         #[pallet::constant]
         type SmoothingFactor: Get<u32>;
     }
 
-    /// Génèse : permet de pré-initialiser l'état de liquidité.
+    /// Stockage de l'état de liquidité.
+    #[pallet::storage]
+    #[pallet::getter(fn liquidity_state)]
+    pub type LiquidityStateStorage<T: Config> = StorageValue<_, LiquidityState, ValueQuery>;
+
+    /// Configuration de genèse pour pré‑initialiser l'état de liquidité.
     #[pallet::genesis_config]
     pub struct GenesisConfig<T: Config> {
         pub liquidity_state: Option<LiquidityState>,
@@ -94,11 +101,6 @@ pub mod pallet {
         }
     }
 
-    /// Stockage de l'état de liquidité.
-    #[pallet::storage]
-    #[pallet::getter(fn liquidity_state)]
-    pub type LiquidityStateStorage<T: Config> = StorageValue<_, LiquidityState, ValueQuery>;
-
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
@@ -109,7 +111,7 @@ pub mod pallet {
 
     #[pallet::error]
     pub enum Error<T> {
-        /// La valeur de l'ajustement (métrique) est invalide.
+        /// La valeur de l'ajustement (métrique) doit être supérieure à zéro.
         InvalidAdjustmentMetric,
         /// Le facteur de lissage ne peut pas être nul.
         ZeroSmoothingFactor,
@@ -118,9 +120,9 @@ pub mod pallet {
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         /// Initialise l'état de liquidité avec la valeur de base.
+        /// Seul Root peut appeler cette fonction.
         #[pallet::weight(10_000)]
         pub fn initialize_state(origin: OriginFor<T>) -> DispatchResult {
-            // Seule la racine (Root) est autorisée à initialiser l'état.
             ensure_root(origin)?;
             let timestamp = <frame_system::Pallet<T>>::block_number().saturated_into::<u64>();
             let baseline = T::BaselineLiquidity::get();
@@ -139,19 +141,19 @@ pub mod pallet {
 
         /// Met à jour le niveau de liquidité en fonction d'une métrique d'ajustement.
         ///
-        /// Le nouveau niveau est calculé ainsi :
-        /// `new_level = current_level + (adjustment_metric / smoothing_factor)`
+        /// Le nouveau niveau est calculé par :
+        ///     new_level = current_level + (adjustment_metric / smoothing_factor)
         #[pallet::weight(10_000)]
         pub fn update_liquidity(origin: OriginFor<T>, adjustment_metric: u32) -> DispatchResult {
-            // Ici, nous acceptons un appel signé.
             ensure_signed(origin)?;
             ensure!(adjustment_metric > 0, Error::<T>::InvalidAdjustmentMetric);
-            // Vérifie que le facteur de lissage n'est pas nul.
-            ensure!(T::SmoothingFactor::get() != 0, Error::<T>::ZeroSmoothingFactor);
+
+            let smoothing = T::SmoothingFactor::get();
+            ensure!(smoothing != 0, Error::<T>::ZeroSmoothingFactor);
 
             let mut state = <LiquidityStateStorage<T>>::get();
             let previous_level = state.current_level;
-            let adjustment = adjustment_metric / T::SmoothingFactor::get();
+            let adjustment = adjustment_metric / smoothing;
             let new_level = previous_level.saturating_add(adjustment);
 
             state.current_level = new_level;
@@ -166,6 +168,14 @@ pub mod pallet {
 
             Self::deposit_event(Event::LiquidityUpdated(previous_level, new_level, adjustment_metric));
             Ok(())
+        }
+    }
+
+    impl<T: Config> Pallet<T> {
+        /// Retourne un horodatage fixe.
+        /// En production, remplacez par `pallet_timestamp` pour obtenir un temps réel.
+        fn current_timestamp() -> u64 {
+            1_640_000_000
         }
     }
 
@@ -184,7 +194,7 @@ pub mod pallet {
         type Block = system::mocking::MockBlock<Test>;
 
         frame_support::construct_runtime!(
-            pub enum Test where
+            pub enum Test where 
                 Block = Block,
                 NodeBlock = Block,
                 UncheckedExtrinsic = UncheckedExtrinsic,
@@ -235,40 +245,36 @@ pub mod pallet {
 
         #[test]
         fn test_initialize_state() {
-            // Appel depuis Root.
-            assert_ok!(LiquidityFlowModule::initialize_state(system::RawOrigin::Root.into()));
+            let origin = system::RawOrigin::Root.into();
+            assert_ok!(LiquidityFlowModule::initialize_state(origin));
             let state = LiquidityFlowModule::liquidity_state();
             assert_eq!(state.current_level, BaselineLiquidity::get());
             assert_eq!(state.history.len(), 1);
             let record = &state.history[0];
             assert_eq!(record.new_level, BaselineLiquidity::get());
-            // Le niveau précédent était 0.
         }
 
         #[test]
         fn test_update_liquidity() {
-            // Initialisation de l'état.
-            assert_ok!(LiquidityFlowModule::initialize_state(system::RawOrigin::Root.into()));
+            let root_origin = system::RawOrigin::Root.into();
+            assert_ok!(LiquidityFlowModule::initialize_state(root_origin));
             let initial_state = LiquidityFlowModule::liquidity_state();
             let initial_level = initial_state.current_level;
-            // Avec adjustment_metric = 50 et SmoothingFactor = 10, l'ajustement sera 50/10 = 5.
+            // Avec adjustment_metric = 50 et SmoothingFactor = 10, l'ajustement sera 50 / 10 = 5.
             let adjustment_metric = 50;
             assert_ok!(LiquidityFlowModule::update_liquidity(system::RawOrigin::Signed(1).into(), adjustment_metric));
             let new_state = LiquidityFlowModule::liquidity_state();
             assert_eq!(new_state.current_level, initial_level + 5);
-            // L'historique doit comporter une nouvelle entrée.
             assert_eq!(new_state.history.len(), 2);
         }
 
         #[test]
         fn test_update_liquidity_fail_invalid_adjustment() {
-            // Teste que l'appel échoue avec un adjustment_metric nul.
             assert_err!(
                 LiquidityFlowModule::update_liquidity(system::RawOrigin::Signed(1).into(), 0),
                 Error::<Test>::InvalidAdjustmentMetric
             );
         }
-
-        // Note : Pour tester le cas ZeroSmoothingFactor, il faudrait définir une configuration de test avec SmoothingFactor = 0.
     }
 }
+
