@@ -3,11 +3,11 @@
 
 //! # Nodara Reputation Module - Locked and Ready for Deployment
 //!
-//! This module manages the reputation system within the Nodara BIOSPHÈRE QUANTIC network.
-//! It tracks and aggregates reputation scores for accounts, maintains a detailed history log,
-//! and integrates with on-chain governance for dynamic parameter adjustments.
+//! Ce module gère le système de réputation au sein du réseau Nodara BIOSPHÈRE QUANTIC. Il agrège les scores de réputation
+//! pour chaque compte, conserve un historique détaillé des ajustements et intègre la gouvernance on-chain pour la modification
+//! dynamique des paramètres.
 //!
-//! All dependencies are locked to ensure a reproducible build in production.
+//! Toutes les dépendances sont verrouillées pour garantir une reproductibilité en production.
 
 pub use pallet::*;
 
@@ -22,36 +22,36 @@ pub mod pallet {
     use scale_info::TypeInfo;
     use sp_std::vec::Vec;
 
-    /// Structure representing a log entry for reputation changes.
+    /// Structure représentant une entrée dans l'historique des ajustements de réputation.
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     pub struct ReputationLog {
-        /// Unix timestamp of the adjustment.
+        /// Timestamp (Unix seconds) de l'ajustement.
         pub timestamp: u64,
-        /// Change in reputation (can be positive or negative).
+        /// Variation de réputation (positive ou négative).
         pub delta: i32,
-        /// Reason for the reputation change.
+        /// Raison de l'ajustement.
         pub reason: Vec<u8>,
     }
 
-    /// Structure representing the reputation record for an account.
+    /// Structure représentant l'enregistrement de réputation pour un compte.
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     pub struct ReputationRecord {
-        /// The current reputation score.
+        /// Score de réputation courant.
         pub score: u32,
-        /// History log of reputation adjustments.
+        /// Historique complet des ajustements.
         pub history: Vec<ReputationLog>,
     }
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// Runtime event type.
+        /// Type d'événement du runtime.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-        /// Initial reputation score for a new account.
+        /// Score de réputation initial pour un nouveau compte.
         #[pallet::constant]
         type InitialReputation: Get<u32>;
     }
 
-    /// Storage mapping each account to its reputation record.
+    /// Stockage des enregistrements de réputation pour chaque compte.
     #[pallet::storage]
     #[pallet::getter(fn reputations)]
     pub type Reputations<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, ReputationRecord, OptionQuery>;
@@ -59,15 +59,15 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        /// Emitted when a reputation update occurs: (account, delta, new score)
+        /// Émission lors d'un ajustement de réputation. (compte, delta, nouveau score)
         ReputationUpdated(T::AccountId, i32, u32),
     }
 
     #[pallet::error]
     pub enum Error<T> {
-        /// No reputation record found for the account.
+        /// Aucun enregistrement de réputation trouvé pour ce compte.
         ReputationNotFound,
-        /// Reputation update would result in a negative score.
+        /// L'ajustement conduirait à un score négatif.
         ReputationUnderflow,
     }
 
@@ -76,7 +76,7 @@ pub mod pallet {
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
-        /// Initializes the reputation of the caller with the initial reputation value.
+        /// Initialise la réputation de l'appelant avec la valeur initiale.
         #[pallet::weight(10_000)]
         pub fn initialize_reputation(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
@@ -89,8 +89,8 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Updates the reputation of the caller based on a delta.
-        /// `delta` can be positive (increase) or negative (decrease).
+        /// Met à jour la réputation de l'appelant en fonction d'une variation.
+        /// Le delta peut être positif (augmentation) ou négatif (diminution).
         #[pallet::weight(10_000)]
         pub fn update_reputation(origin: OriginFor<T>, delta: i32, reason: Vec<u8>) -> DispatchResult {
             let who = ensure_signed(origin)?;
@@ -113,8 +113,8 @@ pub mod pallet {
     }
 
     impl<T: Config> Pallet<T> {
-        /// Returns a fixed timestamp.
-        /// In production, replace this with a reliable time provider (e.g., pallet_timestamp).
+        /// Retourne un timestamp fixe pour les tests.
+        /// En production, remplacez ceci par une source de temps fiable (par ex. `pallet_timestamp`).
         fn current_timestamp() -> u64 {
             1_640_000_000
         }
@@ -135,7 +135,7 @@ pub mod pallet {
         type Block = system::mocking::MockBlock<Test>;
 
         frame_support::construct_runtime!(
-            pub enum Test where
+            pub enum Test where 
                 Block = Block,
                 NodeBlock = Block,
                 UncheckedExtrinsic = UncheckedExtrinsic,
@@ -153,3 +153,64 @@ pub mod pallet {
         impl system::Config for Test {
             type BaseCallFilter = frame_support::traits::Everything;
             type BlockWeights = ();
+            type BlockLength = ();
+            type DbWeight = ();
+            type RuntimeOrigin = system::mocking::Origin;
+            type RuntimeCall = Call;
+            type Index = u64;
+            type BlockNumber = u64;
+            type Hash = H256;
+            type Hashing = BlakeTwo256;
+            type AccountId = u64;
+            type Lookup = IdentityLookup<Self::AccountId>;
+            type Header = Header;
+            type RuntimeEvent = ();
+            type BlockHashCount = BlockHashCount;
+            type Version = ();
+            type PalletInfo = ();
+            type AccountData = ();
+            type OnNewAccount = ();
+            type OnKilledAccount = ();
+            type SystemWeightInfo = ();
+            type SS58Prefix = ();
+            type OnSetCode = ();
+            type MaxConsumers = ();
+        }
+
+        impl Config for Test {
+            type RuntimeEvent = ();
+            type InitialReputation = InitialReputation;
+        }
+
+        #[test]
+        fn initialize_reputation_should_work() {
+            let origin = system::RawOrigin::Signed(1).into();
+            assert_ok!(ReputationModule::initialize_reputation(origin));
+            let record = ReputationModule::reputations(1).expect("Reputation record must exist");
+            assert_eq!(record.score, InitialReputation::get());
+        }
+
+        #[test]
+        fn update_reputation_should_work() {
+            let origin = system::RawOrigin::Signed(1).into();
+            assert_ok!(ReputationModule::initialize_reputation(origin.clone()));
+            // Update reputation: add 50 points.
+            assert_ok!(ReputationModule::update_reputation(system::RawOrigin::Signed(1).into(), 50, b"Good behavior".to_vec()));
+            let record = ReputationModule::reputations(1).expect("Record exists");
+            assert_eq!(record.score, InitialReputation::get() + 50);
+            // History should contain one log entry.
+            assert_eq!(record.history.len(), 1);
+        }
+
+        #[test]
+        fn update_reputation_should_fail_on_underflow() {
+            let origin = system::RawOrigin::Signed(1).into();
+            assert_ok!(ReputationModule::initialize_reputation(origin.clone()));
+            let delta = -(InitialReputation::get() as i32 + 1);
+            assert_err!(
+                ReputationModule::update_reputation(system::RawOrigin::Signed(1).into(), delta, b"Bad behavior".to_vec()),
+                Error::<Test>::ReputationUnderflow
+            );
+        }
+    }
+}
