@@ -157,5 +157,125 @@ pub mod pallet {
             1_640_000_000
         }
     }
-}
 
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use frame_support::{assert_err, assert_ok, parameter_types};
+        use sp_core::H256;
+        use sp_runtime::{
+            traits::{BlakeTwo256, IdentityLookup},
+            testing::Header,
+        };
+        use frame_system as system;
+
+        type UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
+        type Block = system::mocking::MockBlock<Test>;
+
+        frame_support::construct_runtime!(
+            pub enum Test where
+                Block = Block,
+                NodeBlock = Block,
+                UncheckedExtrinsic = UncheckedExtrinsic,
+            {
+                System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+                IdentityModule: Pallet,
+            }
+        );
+
+        parameter_types! {
+            pub const BlockHashCount: u64 = 250;
+            pub const DefaultVerification: bool = true;
+            pub const MaxKycLength: u32 = 256;
+        }
+
+        impl system::Config for Test {
+            type BaseCallFilter = frame_support::traits::Everything;
+            type BlockWeights = ();
+            type BlockLength = ();
+            type DbWeight = ();
+            type RuntimeOrigin = system::mocking::Origin;
+            type RuntimeCall = Call;
+            type Index = u64;
+            type BlockNumber = u64;
+            type Hash = H256;
+            type Hashing = BlakeTwo256;
+            type AccountId = u64;
+            type Lookup = IdentityLookup<Self::AccountId>;
+            type Header = Header;
+            type RuntimeEvent = ();
+            type BlockHashCount = BlockHashCount;
+            type Version = ();
+            type PalletInfo = ();
+            type AccountData = ();
+            type OnNewAccount = ();
+            type OnKilledAccount = ();
+            type SystemWeightInfo = ();
+            type SS58Prefix = ();
+            type OnSetCode = ();
+            type MaxConsumers = ();
+        }
+
+        impl Config for Test {
+            type RuntimeEvent = ();
+            type DefaultVerification = DefaultVerification;
+            type MaxKycLength = MaxKycLength;
+        }
+
+        #[test]
+        fn register_identity_should_work() {
+            // Enregistrement d'une identité avec des détails KYC valides.
+            let origin = system::RawOrigin::Signed(1).into();
+            let kyc_details = b"Informations KYC chiffrées".to_vec();
+            assert_ok!(IdentityModule::register_identity(origin, kyc_details.clone()));
+
+            // Vérification que l'identité est stockée.
+            let identity = IdentityModule::identities(1).expect("L'identité doit être enregistrée");
+            assert_eq!(identity.kyc_details, kyc_details);
+            assert_eq!(identity.verified, DefaultVerification::get());
+
+            // Vérification de l'historique.
+            let history = IdentityModule::identity_history();
+            assert!(!history.is_empty());
+        }
+
+        #[test]
+        fn register_identity_should_fail_if_already_exists() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let kyc_details = b"Informations KYC".to_vec();
+            // Premier enregistrement réussi.
+            assert_ok!(IdentityModule::register_identity(origin.clone(), kyc_details.clone()));
+            // Second enregistrement pour le même compte doit échouer.
+            assert_err!(
+                IdentityModule::register_identity(origin, kyc_details),
+                Error::<Test>::IdentityAlreadyExists
+            );
+        }
+
+        #[test]
+        fn update_identity_should_work() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let kyc_details = b"Informations KYC initiales".to_vec();
+            assert_ok!(IdentityModule::register_identity(origin.clone(), kyc_details));
+
+            let new_details = b"Nouvelles informations KYC".to_vec();
+            // Mise à jour de l'identité.
+            assert_ok!(IdentityModule::update_identity(system::RawOrigin::Signed(1).into(), new_details.clone(), false));
+
+            // Vérification des modifications.
+            let identity = IdentityModule::identities(1).expect("L'identité doit exister");
+            assert_eq!(identity.kyc_details, new_details);
+            assert_eq!(identity.verified, false);
+        }
+
+        #[test]
+        fn update_identity_should_fail_if_not_found() {
+            // Tentative de mise à jour pour un compte inexistant.
+            let new_details = b"Test".to_vec();
+            assert_err!(
+                IdentityModule::update_identity(system::RawOrigin::Signed(99).into(), new_details, false),
+                Error::<Test>::IdentityNotFound
+            );
+        }
+    }
+}
