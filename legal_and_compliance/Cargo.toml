@@ -1,29 +1,33 @@
 [package]
 name = "legal_and_compliance"
 version = "1.0.0"
-authors = ["Nodara BIOSPHÈRE Core <core@nodara.org>"]
+authors = ["Nodara Dev Team <core@nodara.org>"]
 edition = "2021"
-description = "Legal and Compliance module for Nodara BIOSPHÈRE QUANTIC. This module ensures decentralized regulatory compliance, legal audits, consent engine and explainable AI interaction for lawful operation of the network."
+description = "Legal and Compliance module for Nodara BIOSPHÈRE QUANTIC. This module implements regulatory compliance, legal verification, and audit logging for the network."
 license = "MIT"
-repository = "https://github.com/rdemz/Nodara-Biosph-re"
 readme = "README.md"
-keywords = ["substrate", "blockchain", "compliance", "law", "biosphere"]
-categories = ["cryptography", "network-programming", "finance"]
-documentation = "https://docs.nodara.org/legal_and_compliance"
+repository = "https://github.com/rdemz/Nodara-Biosph-re"
+keywords = ["substrate", "pallet", "compliance", "legal", "audit"]
+categories = ["cryptography::identity", "finance", "blockchain"]
+publish = false
 
 [dependencies]
-# Substrate FRAME dependencies (version compatible with Substrate 1.0 ecosystem)
-frame-support = { version = "24.0.0", default-features = false, package = "pallet-support" }
-frame-system = { version = "24.0.0", default-features = false, package = "pallet-system" }
-sp-runtime = { version = "24.0.0", default-features = false }
-sp-std = { version = "24.0.0", default-features = false }
+# Substrate FRAME dependencies
+frame-support = { version = "6.0.0", default-features = false }
+frame-system = { version = "6.0.0", default-features = false }
 
-# SCALE codec and metadata
-codec = { package = "parity-scale-codec", version = "3.6.5", default-features = false, features = ["derive"] }
-scale-info = { version = "2.10.0", default-features = false, features = ["derive"] }
+# Substrate primitives
+sp-runtime = { version = "6.0.0", default-features = false }
+sp-std = { version = "6.0.0", default-features = false }
 
-# Internal dependencies (optionnel si vous utilisez d'autres modules Nodara)
-# nodara-legal-types = { path = "../common/nodara-legal-types", default-features = false }
+# Encoding and metadata
+codec = { version = "6.0.0", default-features = false, features = ["derive"] }
+scale-info = { version = "2.3.0", default-features = false, features = ["derive"] }
+
+[dev-dependencies]
+sp-core = "6.0.0"
+sp-io = "6.0.0"
+frame-benchmarking = { version = "6.0.0", optional = true }
 
 [features]
 default = ["std"]
@@ -34,5 +38,10 @@ std = [
     "sp-std/std",
     "codec/std",
     "scale-info/std"
+]
+runtime-benchmarks = [
+    "frame-benchmarking",
+    "frame-support/runtime-benchmarks",
+    "frame-system/runtime-benchmarks",
 ]
 
