@@ -1,44 +1,8 @@
-//! # Monitoring and Dashboard Module
-//!
-//! Ce module fournit des fonctionnalités pour la surveillance et l'intégration de dashboards dans Nodara BIOSPHÈRE QUANTIC.
-//! Il inclut :
-//! - L'initialisation du logging et de la collecte de métriques.
-//! - Un serveur HTTP pour exposer les métriques au format Prometheus.
-//! - Des fonctions pour charger une configuration de dashboard (ex. Grafana).
-//!
-//! ## Exemples d'utilisation
-//!
-//! Initialisez le module et démarrez le serveur de métriques :
-//!
-//! ```no_run
-//! use monitoring_and_dashboard::{init_monitoring, serve_metrics, dashboard, metrics};
-//! use std::net::SocketAddr;
-//! 
-//! #[tokio::main]
-//! async fn main() {
-//!     // Initialisation du module
-//!     init_monitoring();
-//!     
-//!     // Incrémente un compteur exemple
-//!     metrics::MY_COUNTER.inc();
-//!     
-//!     // Chargement de la configuration du dashboard
-//!     match dashboard::load_dashboard_config() {
-//!         Ok(config) => println!("Dashboard config: {}", config),
-//!         Err(e) => eprintln!("Erreur de chargement de la config: {}", e),
-//!     }
-//!     
-//!     // Démarrage du serveur HTTP pour exposer les métriques
-//!     let addr: SocketAddr = "127.0.0.1:9898".parse().expect("Adresse invalide");
-//!     serve_metrics(addr).await;
-//! }
-//! ```  
-
 use std::net::SocketAddr;
 use std::convert::Infallible;
-
 use hyper::{Body, Request, Response, Server};
 use hyper::service::{make_service_fn, service_fn};
+use tracing::{info, error};
 
 /// Module de métriques : collecte et exposition des métriques au format Prometheus.
 pub mod metrics {
@@ -75,39 +39,30 @@ pub mod metrics {
 pub mod dashboard {
     use std::fs;
     use std::io;
+    use tracing::info;
 
     /// Charge la configuration du dashboard à partir d'un fichier JSON.
     pub fn load_dashboard_config() -> io::Result<String> {
-        fs::read_to_string("grafana_dashboard.json")
+        let config = fs::read_to_string("grafana_dashboard.json")?;
+        info!("Dashboard configuration loaded successfully.");
+        Ok(config)
+    }
+
+    /// Fonction de rechargement de la configuration (peut être appelée par une API ou programmée périodiquement).
+    pub fn reload_dashboard_config() -> io::Result<String> {
+        load_dashboard_config()
     }
 }
 
 /// Initialise le module de monitoring et dashboard.
-/// Cette fonction configure le logging et peut être étendue pour d'autres initialisations.
+/// Cette fonction initialise la journalisation avec `tracing_subscriber` pour un logging structuré.
 pub fn init_monitoring() {
-    // Initialisation du logging (ignore l'erreur si déjà initialisé)
-    let _ = env_logger::builder().is_test(true).try_init();
-    println!("Monitoring and Dashboard module initialized.");
+    // Initialisation de la journalisation.
+    tracing_subscriber::fmt::init();
+    info!("Monitoring and Dashboard module initialized.");
 }
 
-/// Démarre un serveur HTTP pour exposer les métriques Prometheus.
-/// 
-/// # Arguments
-/// 
-/// * `addr` - L'adresse socket sur laquelle le serveur écoutera.
-/// 
-/// # Exemple
-/// 
-/// ```no_run
-/// use monitoring_and_dashboard::serve_metrics;
-/// use std::net::SocketAddr;
-/// 
-/// #[tokio::main]
-/// async fn main() {
-///     let addr: SocketAddr = "127.0.0.1:9898".parse().unwrap();
-///     serve_metrics(addr).await;
-/// }
-/// ```
+/// Démarre un serveur HTTP pour exposer les métriques au format Prometheus.
 pub async fn serve_metrics(addr: SocketAddr) {
     async fn metrics_handler(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
         let body = metrics::gather_metrics();
@@ -120,9 +75,32 @@ pub async fn serve_metrics(addr: SocketAddr) {
 
     let server = Server::bind(&addr).serve(make_svc);
 
-    println!("Serving metrics on http://{}", addr);
+    info!("Serving metrics on http://{}", addr);
 
     if let Err(e) = server.await {
-        eprintln!("Server error: {}", e);
+        error!("Server error: {}", e);
+    }
+}
+
+/// Démarre un serveur HTTP pour exposer la configuration du dashboard.
+/// Cela permet de recharger la configuration du dashboard via une API simple.
+pub async fn serve_dashboard(addr: SocketAddr) {
+    async fn dashboard_handler(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
+        match dashboard::load_dashboard_config() {
+            Ok(config) => Ok(Response::new(Body::from(config))),
+            Err(e) => Ok(Response::new(Body::from(format!("Error loading dashboard config: {}", e)))),
+        }
+    }
+
+    let make_svc = make_service_fn(|_conn| async {
+        Ok::<_, Infallible>(service_fn(dashboard_handler))
+    });
+
+    let server = Server::bind(&addr).serve(make_svc);
+
+    info!("Serving dashboard config on http://{}", addr);
+
+    if let Err(e) = server.await {
+        error!("Dashboard server error: {}", e);
     }
 }
