@@ -44,14 +44,14 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// Type d'événement du runtime.
+        /// Runtime event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-        /// Score de réputation initial pour un nouveau compte.
+        /// Initial reputation score for a new account.
         #[pallet::constant]
         type InitialReputation: Get<u32>;
     }
 
-    /// Stockage des reputations, associant chaque compte à son enregistrement.
+    /// Storage mapping each account to its reputation record.
     #[pallet::storage]
     #[pallet::getter(fn reputations)]
     pub type Reputations<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, ReputationRecord, OptionQuery>;
@@ -59,16 +59,15 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        /// Émission d'un événement lors d'une mise à jour de la réputation:
-        /// (compte, variation, nouveau score)
+        /// Emitted when a reputation update occurs: (account, delta, new score)
         ReputationUpdated(T::AccountId, i32, u32),
     }
 
     #[pallet::error]
     pub enum Error<T> {
-        /// Aucun enregistrement de réputation trouvé pour ce compte.
+        /// No reputation record found for the account.
         ReputationNotFound,
-        /// Mise à jour de la réputation conduirait à une sous-flux (score négatif).
+        /// Reputation update would result in a negative score.
         ReputationUnderflow,
     }
 
@@ -77,7 +76,7 @@ pub mod pallet {
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
-        /// Initialise la réputation d'un compte avec la valeur initiale.
+        /// Initializes the reputation of the caller with the initial reputation value.
         #[pallet::weight(10_000)]
         pub fn initialize_reputation(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
@@ -90,8 +89,8 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Met à jour la réputation d'un compte en fonction d'une variation.
-        /// `delta` peut être positif (augmentation) ou négatif (diminution).
+        /// Updates the reputation of the caller based on a delta.
+        /// `delta` can be positive (increase) or negative (decrease).
         #[pallet::weight(10_000)]
         pub fn update_reputation(origin: OriginFor<T>, delta: i32, reason: Vec<u8>) -> DispatchResult {
             let who = ensure_signed(origin)?;
@@ -114,10 +113,43 @@ pub mod pallet {
     }
 
     impl<T: Config> Pallet<T> {
-        /// Retourne un timestamp fixe (à remplacer en production par un fournisseur de temps fiable).
+        /// Returns a fixed timestamp.
+        /// In production, replace this with a reliable time provider (e.g., pallet_timestamp).
         fn current_timestamp() -> u64 {
             1_640_000_000
         }
     }
-}
 
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use frame_support::{assert_ok, assert_err, parameter_types};
+        use sp_core::H256;
+        use sp_runtime::{
+            traits::{BlakeTwo256, IdentityLookup},
+            testing::Header,
+        };
+        use frame_system as system;
+
+        type UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
+        type Block = system::mocking::MockBlock<Test>;
+
+        frame_support::construct_runtime!(
+            pub enum Test where
+                Block = Block,
+                NodeBlock = Block,
+                UncheckedExtrinsic = UncheckedExtrinsic,
+            {
+                System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+                ReputationModule: Pallet,
+            }
+        );
+
+        parameter_types! {
+            pub const BlockHashCount: u64 = 250;
+            pub const InitialReputation: u32 = 100;
+        }
+
+        impl system::Config for Test {
+            type BaseCallFilter = frame_support::traits::Everything;
+            type BlockWeights = ();
