@@ -38,87 +38,87 @@ pub mod pallet {
         /// Metadata associated with the asset (e.g. JSON encoded data).
         pub metadata: Vec<u8>,
         /// Owner of the asset.
-        pub owner: u64, // Pour simplifier, nous utilisons u64. En production, utilisez T::AccountId.
+        pub owner: u64, // For simplicity, using u64. In production, use T::AccountId.
     }
 
-    /// Enum pour distinguer les types d'ordres.
+    /// Enum to distinguish order types.
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
     pub enum OrderType {
         Buy,
         Sell,
     }
 
-    /// Structure représentant un ordre dans le marketplace.
+    /// Structure representing an order in the marketplace.
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     pub struct Order {
-        /// Identifiant unique de l'ordre.
+        /// Unique order identifier.
         pub id: u64,
-        /// Identifiant de l'actif concerné.
+        /// Asset identifier concerned.
         pub asset_id: u64,
-        /// Type d'ordre : Buy ou Sell.
+        /// Order type: Buy or Sell.
         pub order_type: OrderType,
-        /// Prix par unité (en plus petite unité de la monnaie).
+        /// Price per unit (in smallest denomination).
         pub price: u32,
-        /// Quantité à acheter ou vendre.
+        /// Quantity to buy or sell.
         pub quantity: u32,
-        /// Identifiant du compte ayant passé l'ordre.
+        /// Identifier of the account that placed the order.
         pub account: u64,
-        /// Timestamp de placement de l'ordre.
+        /// Timestamp of order placement.
         pub timestamp: u64,
     }
 
-    /// Structure représentant une exécution de trade.
+    /// Structure representing a trade execution.
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     pub struct Trade {
-        /// Identifiant unique du trade.
+        /// Unique trade identifier.
         pub id: u64,
-        /// Identifiant de l'ordre d'achat.
+        /// Buy order identifier.
         pub buy_order_id: u64,
-        /// Identifiant de l'ordre de vente.
+        /// Sell order identifier.
         pub sell_order_id: u64,
-        /// Identifiant de l'actif échangé.
+        /// Asset identifier traded.
         pub asset_id: u64,
-        /// Prix auquel le trade a été exécuté.
+        /// Price at which the trade was executed.
         pub price: u32,
-        /// Quantité échangée.
+        /// Quantity traded.
         pub quantity: u32,
-        /// Timestamp de l'exécution.
+        /// Timestamp of execution.
         pub timestamp: u64,
     }
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// Le type d'événement du runtime.
+        /// Runtime event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-        /// Longueur maximale autorisée pour les métadonnées d'un actif.
+        /// Maximum allowed length for asset metadata.
         #[pallet::constant]
         type MaxAssetMetadataLength: Get<u32>;
-        /// Frais de base pour l'exécution d'un trade.
+        /// Base fee for executing a trade.
         #[pallet::constant]
         type BaseTradeFee: Get<u32>;
     }
 
-    /// Stockage pour les actifs enregistrés.
+    /// Storage for registered assets.
     #[pallet::storage]
     #[pallet::getter(fn assets)]
     pub type Assets<T: Config> = StorageMap<_, Blake2_128Concat, u64, Asset, OptionQuery>;
 
-    /// Stockage pour les ordres d'achat.
+    /// Storage for buy orders.
     #[pallet::storage]
     #[pallet::getter(fn buy_orders)]
     pub type BuyOrders<T: Config> = StorageMap<_, Blake2_128Concat, u64, Order, OptionQuery>;
 
-    /// Stockage pour les ordres de vente.
+    /// Storage for sell orders.
     #[pallet::storage]
     #[pallet::getter(fn sell_orders)]
     pub type SellOrders<T: Config> = StorageMap<_, Blake2_128Concat, u64, Order, OptionQuery>;
 
-    /// Livre d'ordres : association d'un identifiant d'actif à une liste d'identifiants d'ordres.
+    /// Order book: mapping asset id to a list of order ids.
     #[pallet::storage]
     #[pallet::getter(fn order_book)]
     pub type OrderBook<T: Config> = StorageMap<_, Blake2_128Concat, u64, Vec<u64>, ValueQuery>;
 
-    /// Historique des trades exécutés.
+    /// History of executed trades.
     #[pallet::storage]
     #[pallet::getter(fn trades_history)]
     pub type TradesHistory<T: Config> = StorageValue<_, Vec<Trade>, ValueQuery>;
@@ -126,29 +126,29 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        /// Actif enregistré (asset ID, owner).
+        /// Asset registered (asset ID, owner).
         AssetRegistered(u64, u64),
-        /// Ordre passé (order ID, type, asset ID).
+        /// Order placed (order ID, type, asset ID).
         OrderPlaced(u64, OrderType, u64),
-        /// Ordre annulé (order ID).
+        /// Order cancelled (order ID).
         OrderCancelled(u64),
-        /// Trade exécuté (trade ID, asset ID, quantité, prix).
+        /// Trade executed (trade ID, asset ID, quantity, price).
         TradeExecuted(u64, u64, u32, u32),
     }
 
     #[pallet::error]
     pub enum Error<T> {
-        /// Les métadonnées de l'actif dépassent la longueur maximale autorisée.
+        /// Asset metadata exceeds maximum allowed length.
         AssetMetadataTooLong,
-        /// L'actif est déjà enregistré.
+        /// Asset already registered.
         AssetAlreadyRegistered,
-        /// Actif non trouvé.
+        /// Asset not found.
         AssetNotFound,
-        /// Ordre non trouvé.
+        /// Order not found.
         OrderNotFound,
-        /// Quantité insuffisante dans l'ordre.
+        /// Insufficient quantity in the order.
         InsufficientOrderQuantity,
-        /// Paramètres d'ordre invalides.
+        /// Invalid order parameters.
         InvalidOrder,
     }
 
@@ -157,7 +157,7 @@ pub mod pallet {
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
-        /// Enregistre un nouvel actif dans le marketplace.
+        /// Registers a new asset in the marketplace.
         #[pallet::weight(10_000)]
         pub fn register_asset(
             origin: OriginFor<T>,
@@ -176,14 +176,14 @@ pub mod pallet {
             let asset = Asset {
                 id: asset_id,
                 metadata: metadata.clone(),
-                owner: who.into(), // Pour simplifier, conversion en u64 (à adapter selon votre type AccountId)
+                owner: who.into(), // Using u64 conversion; in production, use T::AccountId.
             };
             <Assets<T>>::insert(asset_id, asset);
             Self::deposit_event(Event::AssetRegistered(asset_id, who.into()));
             Ok(())
         }
 
-        /// Place un ordre (achat ou vente) pour un actif.
+        /// Places an order (buy or sell) for an asset.
         #[pallet::weight(10_000)]
         pub fn place_order(
             origin: OriginFor<T>,
@@ -199,7 +199,7 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Annule un ordre existant.
+        /// Cancels an existing order.
         #[pallet::weight(10_000)]
         pub fn cancel_order(
             origin: OriginFor<T>,
@@ -208,16 +208,20 @@ pub mod pallet {
         ) -> DispatchResult {
             let _sender = ensure_signed(origin)?;
             match order_type {
-                OrderType::Buy => ensure!(<BuyOrders<T>>::contains_key(&order_id), Error::<T>::OrderNotFound)
-                                    .then(|| <BuyOrders<T>>::remove(order_id)),
-                OrderType::Sell => ensure!(<SellOrders<T>>::contains_key(&order_id), Error::<T>::OrderNotFound)
-                                    .then(|| <SellOrders<T>>::remove(order_id)),
+                OrderType::Buy => {
+                    ensure!(<BuyOrders<T>>::contains_key(&order_id), Error::<T>::OrderNotFound);
+                    <BuyOrders<T>>::remove(order_id);
+                },
+                OrderType::Sell => {
+                    ensure!(<SellOrders<T>>::contains_key(&order_id), Error::<T>::OrderNotFound);
+                    <SellOrders<T>>::remove(order_id);
+                },
             };
             Self::deposit_event(Event::OrderCancelled(order_id));
             Ok(())
         }
 
-        /// Exécute un trade en associant directement un ordre d'achat et un ordre de vente.
+        /// Executes a trade by matching a buy order and a sell order.
         #[pallet::weight(10_000)]
         pub fn execute_trade(
             origin: OriginFor<T>,
@@ -226,8 +230,7 @@ pub mod pallet {
             let _sender = ensure_signed(origin)?;
             ensure!(<BuyOrders<T>>::contains_key(&trade.buy_order_id), Error::<T>::OrderNotFound);
             ensure!(<SellOrders<T>>::contains_key(&trade.sell_order_id), Error::<T>::OrderNotFound);
-            // Ici, on effectue la logique de correspondance et d'exécution.
-            // Pour simplifier, nous supposons une correspondance directe et supprimons les ordres.
+            // For simplicity, we assume a direct match and remove the orders.
             <BuyOrders<T>>::remove(trade.buy_order_id);
             <SellOrders<T>>::remove(trade.sell_order_id);
             <TradesHistory<T>>::mutate(|history| history.push(trade.clone()));
@@ -237,10 +240,174 @@ pub mod pallet {
     }
 
     impl<T: Config> Pallet<T> {
-        /// Renvoie un timestamp fixe pour les tests.
-        /// À remplacer par une intégration au `pallet_timestamp` en production.
+        /// Returns a fixed timestamp for testing purposes.
+        /// In production, integrate with `pallet_timestamp`.
         fn current_timestamp() -> u64 {
             1_640_000_000
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use frame_support::{assert_ok, assert_err, parameter_types};
+        use sp_core::H256;
+        use sp_runtime::{
+            traits::{BlakeTwo256, IdentityLookup},
+            testing::Header,
+        };
+        use frame_system as system;
+
+        type UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
+        type Block = system::mocking::MockBlock<Test>;
+
+        frame_support::construct_runtime!(
+            pub enum Test where
+                Block = Block,
+                NodeBlock = Block,
+                UncheckedExtrinsic = UncheckedExtrinsic,
+            {
+                System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+                MarketplaceModule: Pallet,
+            }
+        );
+
+        parameter_types! {
+            pub const BlockHashCount: u64 = 250;
+            pub const MaxAssetMetadataLength: u32 = 256;
+            pub const BaseTradeFee: u32 = 10;
+        }
+
+        impl system::Config for Test {
+            type BaseCallFilter = frame_support::traits::Everything;
+            type BlockWeights = ();
+            type BlockLength = ();
+            type DbWeight = ();
+            type RuntimeOrigin = system::mocking::Origin;
+            type RuntimeCall = Call;
+            type Index = u64;
+            type BlockNumber = u64;
+            type Hash = H256;
+            type Hashing = BlakeTwo256;
+            type AccountId = u64;
+            type Lookup = IdentityLookup<Self::AccountId>;
+            type Header = Header;
+            type RuntimeEvent = ();
+            type BlockHashCount = BlockHashCount;
+            type Version = ();
+            type PalletInfo = ();
+            type AccountData = ();
+            type OnNewAccount = ();
+            type OnKilledAccount = ();
+            type SystemWeightInfo = ();
+            type SS58Prefix = ();
+            type OnSetCode = ();
+            type MaxConsumers = ();
+        }
+
+        impl Config for Test {
+            type RuntimeEvent = ();
+            type MaxAssetMetadataLength = MaxAssetMetadataLength;
+            type BaseTradeFee = BaseTradeFee;
+        }
+
+        #[test]
+        fn register_asset_should_work() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let asset_id = 42;
+            let metadata = b"{\"name\": \"Asset42\"}".to_vec();
+            assert_ok!(MarketplaceModule::register_asset(origin, asset_id, metadata.clone()));
+            let asset = MarketplaceModule::assets(asset_id).expect("Asset should be registered");
+            assert_eq!(asset.metadata, metadata);
+            // Check event emission (if event testing is desired)
+        }
+
+        #[test]
+        fn register_asset_should_fail_if_metadata_too_long() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let asset_id = 43;
+            let metadata = vec![0u8; (MaxAssetMetadataLength::get() + 1) as usize];
+            assert_err!(
+                MarketplaceModule::register_asset(origin, asset_id, metadata),
+                Error::<Test>::AssetMetadataTooLong
+            );
+        }
+
+        #[test]
+        fn register_asset_should_fail_if_already_registered() {
+            let origin = system::RawOrigin::Signed(1).into();
+            let asset_id = 44;
+            let metadata = b"{\"name\": \"Asset44\"}".to_vec();
+            assert_ok!(MarketplaceModule::register_asset(origin.clone(), asset_id, metadata.clone()));
+            assert_err!(
+                MarketplaceModule::register_asset(origin, asset_id, metadata),
+                Error::<Test>::AssetAlreadyRegistered
+            );
+        }
+
+        #[test]
+        fn place_and_cancel_order_should_work() {
+            // Place a buy order.
+            let origin = system::RawOrigin::Signed(1).into();
+            let order = Order {
+                id: 1,
+                asset_id: 100,
+                order_type: OrderType::Buy,
+                price: 50,
+                quantity: 10,
+                account: 1,
+                timestamp: MarketplaceModule::current_timestamp(),
+            };
+            assert_ok!(MarketplaceModule::place_order(origin.clone(), order.clone()));
+            let book = MarketplaceModule::order_book(order.asset_id);
+            assert!(book.contains(&order.id));
+
+            // Cancel the order.
+            assert_ok!(MarketplaceModule::cancel_order(origin, order.id, OrderType::Buy));
+            // Verify removal.
+            assert!(!MarketplaceModule::buy_orders(order.id).is_some());
+        }
+
+        #[test]
+        fn execute_trade_should_work() {
+            // Register orders.
+            let origin = system::RawOrigin::Signed(1).into();
+            let buy_order = Order {
+                id: 2,
+                asset_id: 200,
+                order_type: OrderType::Buy,
+                price: 100,
+                quantity: 5,
+                account: 1,
+                timestamp: MarketplaceModule::current_timestamp(),
+            };
+            let sell_order = Order {
+                id: 3,
+                asset_id: 200,
+                order_type: OrderType::Sell,
+                price: 100,
+                quantity: 5,
+                account: 2,
+                timestamp: MarketplaceModule::current_timestamp(),
+            };
+            assert_ok!(MarketplaceModule::place_order(origin.clone(), buy_order.clone()));
+            assert_ok!(MarketplaceModule::place_order(origin.clone(), sell_order.clone()));
+
+            let trade = Trade {
+                id: 1,
+                buy_order_id: buy_order.id,
+                sell_order_id: sell_order.id,
+                asset_id: 200,
+                price: 100,
+                quantity: 5,
+                timestamp: MarketplaceModule::current_timestamp(),
+            };
+            assert_ok!(MarketplaceModule::execute_trade(origin, trade.clone()));
+            // Check that orders have been removed.
+            assert!(!MarketplaceModule::buy_orders(buy_order.id).is_some());
+            assert!(!MarketplaceModule::sell_orders(sell_order.id).is_some());
+            let history = MarketplaceModule::trades_history();
+            assert!(history.iter().any(|t| t.id == trade.id));
         }
     }
 }
