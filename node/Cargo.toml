@@ -6,14 +6,14 @@ edition = "2021"
 description = "Nodara Node - The main executable node for Nodara BIOSPHÈRE QUANTIC."
 license = "MIT"
 repository = "https://github.com/rdemz/Nodara-Biosph-re/tree/main"
-rust-version = "1.68.0"
+rust-version = "1.72.0"
 
 [dependencies]
 # Dépendances pour un node Substrate de base
-sp-core = { version = "6.0.0", default-features = false }
-sp-runtime = { version = "6.0.0", default-features = false }
-frame-support = { version = "6.0.0", default-features = false }
-frame-system = { version = "6.0.0", default-features = false }
+sp-core = { version = "30.0.0", default-features = false }
+sp-runtime = { version = "30.0.0", default-features = false }
+frame-support = { version = "30.0.0", default-features = false }
+frame-system = { version = "30.0.0", default-features = false }
 log = "0.4"
 env_logger = "0.10"
 
