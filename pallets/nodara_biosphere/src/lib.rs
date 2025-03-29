@@ -41,6 +41,7 @@ pub mod pallet {
     #[pallet::generate_store(pub(super) trait Store)]
     pub struct Pallet<T>(_);
 
+    /// Configuration du pallet.
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// Runtime event type.
@@ -54,7 +55,7 @@ pub mod pallet {
         /// Baseline phase for initialization.
         #[pallet::constant]
         type BaselinePhase: Get<BioPhase>;
-        /// Smoothing factor for state transitions.
+        /// Smoothing factor for state transitions. Must not be zero.
         #[pallet::constant]
         type SmoothingFactor: Get<u32>;
     }
@@ -63,6 +64,43 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn bio_state)]
     pub type BioStateStorage<T: Config> = StorageValue<_, BioState, ValueQuery>;
+
+    /// Genesis configuration allowing to pre‑set the bio state.
+    #[pallet::genesis_config]
+    pub struct GenesisConfig<T: Config> {
+        /// Optionally pre‑set a bio state. If None, the state is initialized with baseline values.
+        pub bio_state: Option<BioState>,
+    }
+
+    #[cfg(feature = "std")]
+    impl<T: Config> Default for GenesisConfig<T> {
+        fn default() -> Self {
+            Self { bio_state: None }
+        }
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+        fn build(&self) {
+            if let Some(state) = &self.bio_state {
+                <BioStateStorage<T>>::put(state.clone());
+            } else {
+                // Initialise avec les valeurs de base en l'absence d'une configuration explicite.
+                let now = <frame_system::Pallet<T>>::block_number().saturated_into::<u64>();
+                let baseline_energy = T::BaselineEnergy::get();
+                let baseline_flux = T::BaselineQuantumFlux::get();
+                let baseline_phase = T::BaselinePhase::get();
+                let initial_state = BioState {
+                    current_phase: baseline_phase.clone(),
+                    energy_level: baseline_energy,
+                    quantum_flux: baseline_flux,
+                    last_updated: now,
+                    history: vec![(now, baseline_phase, baseline_energy, baseline_flux)],
+                };
+                <BioStateStorage<T>>::put(initial_state);
+            }
+        }
+    }
 
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -77,6 +115,8 @@ pub mod pallet {
         InvalidSignal,
         /// Signature verification failed.
         SignatureVerificationFailed,
+        /// Smoothing factor cannot be zero.
+        ZeroSmoothingFactor,
         /// Quantum flux calculation error.
         QuantumCalculationFailed,
     }
@@ -84,9 +124,9 @@ pub mod pallet {
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         /// Initializes the bio state with baseline values.
+        /// Only callable by Root.
         #[pallet::weight(10_000)]
         pub fn initialize_state(origin: OriginFor<T>) -> DispatchResult {
-            // Seul un appel provenant de la racine (Root) peut initialiser l'état.
             ensure_root(origin)?;
             let now = <frame_system::Pallet<T>>::block_number().saturated_into::<u64>();
             let baseline_energy = T::BaselineEnergy::get();
@@ -97,7 +137,7 @@ pub mod pallet {
                 energy_level: baseline_energy,
                 quantum_flux: baseline_flux,
                 last_updated: now,
-                history: vec![(now, baseline_phase.clone(), baseline_energy, baseline_flux)],
+                history: vec![(now, baseline_phase, baseline_energy, baseline_flux)],
             };
             <BioStateStorage<T>>::put(initial_state);
             Ok(())
@@ -122,8 +162,14 @@ pub mod pallet {
             } else {
                 BioPhase::Mutation
             };
+
             let new_energy = signal.saturating_mul(10); // Exemple de calcul
-            let new_quantum_flux = (signal.saturating_mul(signal)) / T::SmoothingFactor::get();
+
+            // Vérification pour éviter la division par zéro.
+            let smoothing = T::SmoothingFactor::get();
+            ensure!(smoothing != 0, Error::<T>::ZeroSmoothingFactor);
+            let new_quantum_flux = (signal.saturating_mul(signal)) / smoothing;
+
             let now = <frame_system::Pallet<T>>::block_number().saturated_into::<u64>();
 
             // Mise à jour de l'historique et de l'état.
@@ -140,6 +186,116 @@ pub mod pallet {
 
             Self::deposit_event(Event::BioStateUpdated(current_state.current_phase, new_phase, new_energy, new_quantum_flux));
             Ok(())
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use frame_support::{assert_ok, parameter_types};
+        use sp_core::H256;
+        use sp_runtime::{
+            traits::{BlakeTwo256, IdentityLookup},
+            testing::Header,
+        };
+        use frame_system as system;
+
+        type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+        type Block = frame_system::mocking::MockBlock<Test>;
+
+        frame_support::construct_runtime!(
+            pub enum Test where 
+                Block = Block,
+                NodeBlock = Block,
+                UncheckedExtrinsic = UncheckedExtrinsic,
+            {
+                System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+                Biosphere: Pallet,
+            }
+        );
+
+        parameter_types! {
+            pub const BlockHashCount: u64 = 250;
+            pub const BaselineEnergy: u32 = 100;
+            pub const BaselineQuantumFlux: u32 = 50;
+            pub const SmoothingFactor: u32 = 2;
+        }
+
+        // A simple type to provide a baseline phase.
+        pub struct TestBaselinePhase;
+        impl Get<BioPhase> for TestBaselinePhase {
+            fn get() -> BioPhase {
+                BioPhase::Defense
+            }
+        }
+
+        impl system::Config for Test {
+            type BaseCallFilter = frame_support::traits::Everything;
+            type BlockWeights = ();
+            type BlockLength = ();
+            type DbWeight = ();
+            type RuntimeOrigin = system::mocking::Origin;
+            type RuntimeCall = Call;
+            type Index = u64;
+            type BlockNumber = u64;
+            type Hash = H256;
+            type Hashing = BlakeTwo256;
+            type AccountId = u64;
+            type Lookup = IdentityLookup<Self::AccountId>;
+            type Header = Header;
+            type RuntimeEvent = ();
+            type BlockHashCount = BlockHashCount;
+            type Version = ();
+            type PalletInfo = ();
+            type AccountData = ();
+            type OnNewAccount = ();
+            type OnKilledAccount = ();
+            type SystemWeightInfo = ();
+            type SS58Prefix = ();
+            type OnSetCode = ();
+            type MaxConsumers = ();
+        }
+
+        impl Config for Test {
+            type RuntimeEvent = ();
+            type BaselineEnergy = BaselineEnergy;
+            type BaselineQuantumFlux = BaselineQuantumFlux;
+            type BaselinePhase = TestBaselinePhase;
+            type SmoothingFactor = SmoothingFactor;
+        }
+
+        #[test]
+        fn test_initialize_state() {
+            // Call from Root
+            let origin = system::RawOrigin::Root.into();
+            assert_ok!(Biosphere::initialize_state(origin));
+
+            // Verify that the bio state is initialized with baseline values.
+            let state = Biosphere::bio_state();
+            assert_eq!(state.current_phase, BioPhase::Defense);
+            assert_eq!(state.energy_level, 100);
+            assert_eq!(state.quantum_flux, 50);
+            assert!(!state.history.is_empty());
+        }
+
+        #[test]
+        fn test_transition_phase() {
+            // Initialize state first.
+            let root_origin = system::RawOrigin::Root.into();
+            assert_ok!(Biosphere::initialize_state(root_origin));
+
+            // Transition phase with a valid signal and signature.
+            let signed_origin = system::RawOrigin::Signed(1).into();
+            // For signal = 120, new phase should be Growth, energy = 1200, quantum_flux = (120*120)/2 = 7200.
+            assert_ok!(Biosphere::transition_phase(signed_origin, 120, vec![1,2,3]));
+
+            // Verify that the bio state was updated.
+            let state = Biosphere::bio_state();
+            assert_eq!(state.current_phase, BioPhase::Growth);
+            assert_eq!(state.energy_level, 1200);
+            assert_eq!(state.quantum_flux, 7200);
+            // History should now comport two entries.
+            assert_eq!(state.history.len(), 2);
         }
     }
 }
