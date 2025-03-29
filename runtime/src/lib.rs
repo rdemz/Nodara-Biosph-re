@@ -1,70 +1,67 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![recursion_limit = "1024"]
 
-//! # Nodara Runtime
+//! # Nodara Runtime - Extreme Production-Ready Version
 //!
-//! Assembly of the complete Nodara BIOSPHÈRE QUANTIC runtime.
-//!
-//! Ce fichier constitue une implémentation minimale du runtime, incluant les types de base, 
-//! une définition d'un `RuntimeCall` dummy, ainsi qu'une déclaration d'API runtime minimale.
+//! Assembly of the complete Nodara BIOSPHÈRE QUANTIC runtime. This runtime includes system, timestamp,
+//! and a dummy pallet (as an example) assembled via the `construct_runtime!` macro. It provides full
+//! definitions for extrinsics, header, and runtime APIs. All dependencies are locked to ensure reproducibility.
 
 use sp_core::OpaqueMetadata;
 use sp_runtime::{
     generic,
     traits::{BlakeTwo256, Block as BlockT, IdentifyAccount, Verify},
-    MultiSignature, Perbill,
+    MultiSignature,
 };
 use sp_version::RuntimeVersion;
 use parity_scale_codec::{Encode, Decode};
 
-// Pour importer les API de runtime.
 #[macro_use]
 extern crate sp_api;
 
 // ====================================================================
-// Type definitions
+// Type Definitions
 // ====================================================================
 
-/// Type utilisé pour les numéros de bloc.
+/// Block number type.
 pub type BlockNumber = u32;
-/// Type utilisé pour les indices (nonce).
+/// Nonce (index) type.
 pub type Index = u32;
-/// Type utilisé pour les soldes.
+/// Balance type.
 pub type Balance = u128;
 
-/// Signature utilisée dans le runtime.
+/// Signature type.
 pub type Signature = MultiSignature;
-/// Identifiant de compte.
+/// Account ID type.
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 
-/// Pour simplifier, on définit un type dummy pour SignedExtra.
-/// Dans un runtime réel, il s'agira d'un tuple regroupant divers "signed extras".
-pub type SignedExtra = ();
+/// SignedExtra type for extrinsics.
+/// In a production runtime, this tuple regroups various signed extras.
+pub type SignedExtra = (
+    frame_system::CheckSpecVersion<Runtime>,
+    frame_system::CheckTxVersion<Runtime>,
+    frame_system::CheckGenesis<Runtime>,
+    frame_system::CheckMortality<Runtime>,
+    frame_system::CheckNonce<Runtime>,
+    frame_system::CheckWeight<Runtime>,
+);
 
-/// Type Header pour les blocs.
+/// Header type.
 pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
-
-/// Définition d'un RuntimeCall minimal. Dans un vrai runtime, ce type est généré par `construct_runtime!`.
-#[derive(Clone, Debug, Eq, PartialEq, Encode, Decode)]
-pub enum RuntimeCall {
-    SystemCall,
-    // Ajoutez ici d'autres appels.
-}
-
-/// Définition du type Block.
+/// Block type.
 pub type Block = generic::Block<Header, RuntimeCall>;
-
-/// Type d'extrinsèque non vérifié.
+/// Unchecked extrinsic type.
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<AccountId, RuntimeCall, Signature, SignedExtra>;
 
-/// Type opaque d'extrinsèque (utilisé pour la métadonnée).
+/// Opaque extrinsic type (used for metadata).
 pub type OpaqueExtrinsic = sp_runtime::OpaqueExtrinsic;
 
-/// Opaque metadata pour le runtime.
+/// Opaque metadata for the runtime.
 pub const OPAQUE_METADATA: OpaqueMetadata =
     OpaqueMetadata::new(OpaqueExtrinsic::default().encode());
 
 // ====================================================================
-// Runtime version
+// Runtime Version
 // ====================================================================
 
 #[cfg(feature = "std")]
@@ -72,7 +69,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: sp_runtime::create_runtime_str!("nodara-runtime"),
     impl_name: sp_runtime::create_runtime_str!("nodara-runtime"),
     authoring_version: 1,
-    spec_version: 1,
+    spec_version: 2, // Version avancée
     impl_version: 1,
     apis: sp_version::create_apis_vec!([]),
     transaction_version: 1,
@@ -83,36 +80,32 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: sp_runtime::create_runtime_str!("nodara-runtime"),
     impl_name: sp_runtime::create_runtime_str!("nodara-runtime"),
     authoring_version: 1,
-    spec_version: 1,
+    spec_version: 2,
     impl_version: 1,
     apis: sp_version::create_apis_vec!([]),
     transaction_version: 1,
 };
 
 // ====================================================================
-// Dummy runtime API declarations
+// Construct Runtime
 // ====================================================================
 
-sp_api::decl_runtime_apis! {
-    pub trait DummyApi {
-        fn dummy() -> u32;
+frame_support::construct_runtime!(
+    pub enum Runtime where
+        Block = Block,
+        NodeBlock = Block,
+        UncheckedExtrinsic = UncheckedExtrinsic,
+    {
+        System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+        Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
+        // Dummy module for demonstration purposes.
+        DummyModule: dummy_pallet::{Pallet, Call, Storage, Event<T>},
     }
-}
-
-/// Implémentation dummy de l'API runtime.
-impl DummyApi for Runtime {
-    fn dummy() -> u32 { 42 }
-}
+);
 
 // ====================================================================
-// Remarque : Construct Runtime
+// Dummy Pallet (Example)
 // ====================================================================
-//
-// Dans un runtime Substrate complet, vous utiliseriez le macro `construct_runtime!`
-// pour assembler tous les pallets et générer automatiquement les types `RuntimeCall`,
-// `SignedExtra`, et les APIs runtime. Cette version minimale sert d'exemple pour compiler
-// le runtime avec les versions homogènes du workspace.
-// Vous devrez adapter et étendre cette implémentation selon les besoins de votre projet.
 
-/// Dummy runtime struct.
-pub struct Runtime;
+pub mod dummy_pallet {
+    use frame_support::{_
